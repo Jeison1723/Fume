@@ -8,10 +8,35 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configurar compresión para archivos estáticos de Blazor
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        new[] { "application/octet-stream", "application/wasm" });
+    opts.EnableForHttps = true;
+});
+
 // Add services to the container.
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// Agregar Memory Cache para optimización
+builder.Services.AddMemoryCache();
+
+// Agregar HttpContextAccessor para generar URLs dinámicas
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 builder.Services.AddEndpointsApiExplorer();
@@ -104,14 +129,10 @@ void SeedeDataDb(WebApplication app)
         app.UseSwaggerUI();
   }
 
+    app.UseResponseCompression();
     app.UseHttpsRedirection();
+    app.UseCors("AllowAll");
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
-    app.UseCors(x => x
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       .SetIsOriginAllowed(Origin => true)
-       .AllowCredentials()
-        );
     app.Run();

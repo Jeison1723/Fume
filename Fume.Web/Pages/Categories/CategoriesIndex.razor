@@ -2,78 +2,746 @@
 @inject IRepository repository
 @inject NavigationManager navigationManager
 @inject SweetAlertService sweetAlertService
-@inject IModalService modal
+
+@inject IJSRuntime JS
 @attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Components.Web
+@using Fume.Web.Helpers
 
+<style>
+    .dialog-backdrop-blur {
+        backdrop-filter: blur(8px);
+        background-color: rgba(0, 0, 0, 0.5) !important;
+    }
 
-@if (categories is null)
+    .categories-header {
+        background: linear-gradient(135deg, #2196f3 0%, #eee 100%);
+        padding: 32px;
+        border-radius: 16px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+    }
+
+    .categories-title {
+        color: white;
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .action-buttons-group {
+        animation: slideInRight 0.4s ease-out;
+    }
+
+    @@keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .mud-button-root:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+        transition: all 0.3s ease;
+    }
+
+    .mud-button-group-root .mud-button-root:first-child {
+        border-top-left-radius: 12px !important;
+        border-bottom-left-radius: 12px !important;
+    }
+
+    .mud-button-group-root .mud-button-root:last-child {
+        border-top-right-radius: 12px !important;
+        border-bottom-right-radius: 12px !important;
+    }
+
+    @@media (max-width: 768px) {
+        .categories-header {
+            padding: 20px;
+        }
+
+        .categories-title {
+            font-size: 1.5rem;
+        }
+
+        .action-buttons-group {
+            width: 100%;
+        }
+
+        .mud-button-group-root {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mud-button-group-root .mud-button-root {
+            width: 100%;
+            border-radius: 12px !important;
+            margin-bottom: 8px;
+        }
+    }
+
+    .search-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+    }
+
+    .category-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e3f2fd;
+        transition: all 0.3s ease;
+        margin-bottom: 15px;
+        overflow: hidden;
+    }
+
+    .category-card:hover {
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+        transform: translateY(-3px);
+        border-color: #667eea;
+    }
+
+    .category-name {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #2c3e50;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .category-icon {
+        width: 45px;
+        height: 45px;
+        background: linear-gradient(135deg, #2196f3 0%, #fff 100%);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .category-actions {
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #e3f2fd;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+
+    .stats-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .modal-header-gradient {
+        background: linear-gradient(135deg, #2196f3 0%, #e0e0e0 100%) !important color: white !important;
+    }
+
+    /* Custom Bootstrap Tabs */
+    .tabs-container {
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+
+    .custom-tabs {
+        border: none;
+        background: white;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        padding: 10px 10px 0 10px;
+        gap: 10px;
+    }
+
+    .custom-tabs .nav-item {
+        margin-bottom: 0;
+    }
+
+    .custom-tabs .nav-link {
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 15px 30px;
+        border-radius: 10px 10px 0 0;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        position: relative;
+    }
+
+    .custom-tabs .nav-link i {
+        font-size: 1.2rem;
+    }
+
+    .custom-tabs .nav-link:hover {
+        background: #f8f9fa;
+        color: #2196F3;
+    }
+
+    .custom-tabs .nav-link.active {
+        background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    }
+
+    .custom-tabs .nav-link.active:hover {
+        color: white;
+    }
+
+    .tab-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-left: 5px;
+    }
+
+    .custom-tabs .nav-link.active .tab-badge {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .custom-tab-content {
+        background: white;
+        border-radius: 0 0 12px 12px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        min-height: 400px;
+    }
+
+    .tab-pane {
+        animation: fadeIn 0.4s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .custom-tabs .nav-link {
+            padding: 12px 20px;
+            font-size: 0.9rem;
+        }
+
+        .custom-tabs .nav-link span {
+            display: none;
+        }
+
+        .custom-tabs .nav-link i {
+            font-size: 1.5rem;
+        }
+
+        .tab-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.7rem;
+            padding: 1px 6px;
+        }
+    }
+</style>
+
+@if (loading)
 {
-    <div class="spinner" />
+    <div class="text-center py-5">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        <p class="mt-3">Cargando categorías...</p>
+    </div>
 }
 else
 {
-    <GenerecList Mylist="categories">
-        <Body>
-            <div class="card">
-                <div class="card-header">
-                    <span>
-                        <i class="oi oi-list"></i> Categorías
-                        <a class="btn btn-sm btn-primary float-end" @onclick=@(() => ShowModal())><i class="oi oi-plus"></i> Adicionar Categoría</a>
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="mb-2" style="display: flex; flex-wrap:wrap; align-items: center;">
-                        <div>
-                            <input style="width: 400px;" type="text" class="form-control" id="titulo" placeholder="Buscar categoría..." @bind-value="Filter" />
-                        </div>
-                        <div class="mx-1">
-                            <button type="button" class="btn btn-outline-primary" @onclick="ApplyFilterAsync"><i class="oi oi-layers" /> Filtrar</button>
-                            <button type="button" class="btn btn-outline-danger" @onclick="CleanFilterAsync"><i class="oi oi-ban" /> Limpiar</button>
-                        </div>
-                    </div>
-
-
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Categoría</th>
-                                <th style="width:200px"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var category in categories)
-                            {
-                                <tr>
-                                    <td>
-                                        @category.Name
-                                    </td>
-                                    <td>
-                                        <a @onclick=@(() => ShowModal(category.Id, true)) class="btn btn-warning"><i class="oi oi-pencil" /> Editar</a>
-                                        <button class="btn btn-danger" @onclick=@(() => Delete(category.Id))><i class="oi oi-trash" /> Borrar</button>
-                                    </td>
-                                </tr>
-                            }
-
-
-                            <Pagination CurrentPage="currentPage"
-                                    TotalPages="totalPages"
-                                    SelectedPage="SelectedPageAsync" />
-                        </tbody>
-                    </table>
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+        <!-- Header -->
+        <div class="categories-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap" style="gap: 16px;">
+                <h1 class="categories-title mb-0">
+                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" />
+                    Gestión de Categorías
+                </h1>
+                <div class="action-buttons-group">
+                    <MudButtonGroup Variant="Variant.Filled"
+                                    Size="Size.Large"
+                                    Style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 12px;">
+                        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="@(() => ShowModal())"
+                                   Style="background: white;
+                                              color: #0d6efd;
+                                          font-weight: 600;
+                                          padding: 12px 24px;
+                                          text-transform: none;
+                                          font-size: 1rem;">
+                            Nueva Categoría
+                        </MudButton>
+                        <MudButton StartIcon="@Icons.Material.Filled.AddCircle"
+                                   OnClick="@(() => ShowSubCategoryModal())"
+                                   Style="background: #2196F3;
+                                          color: white;
+                                          font-weight: 600;
+                                          padding: 12px 24px;
+                                          text-transform: none;
+                                          font-size: 1rem;">
+                            Nueva Subcategoría
+                        </MudButton>
+                    </MudButtonGroup>
                 </div>
             </div>
-        </Body>
-    </GenerecList>
+        </div>
+
+        <!-- Tabs Section -->
+      <div class="tabs-container">
+           <ul class="nav nav-tabs custom-tabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                 <button class="nav-link active"
+                    id="categories-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#categories"
+                    type="button"
+                    role="tab"
+                    aria-controls="categories"
+                    aria-selected="true">
+                 <i class="oi oi-list"></i>
+                 <span>Categorías</span>
+                 @if (categories != null)
+                 {
+                 <span class="tab-badge">@categories.Count</span>
+                 }
+                 </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                 <button class="nav-link"
+                    id="subcategories-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#subcategories"
+                    type="button"
+                    role="tab"
+                    aria-controls="subcategories"
+                    aria-selected="false"
+                    @onclick="OnSubCategoriesTabClick">
+                 <i class="oi oi-tag"></i>
+                 <span>Subcategorías</span>
+                 @if (subCategoriesCount > 0)
+                 {
+                 <span class="tab-badge">@subCategoriesCount</span>
+                 }
+                 </button>
+              </li>
+           </ul>
+           <div class="tab-content custom-tab-content">
+              <div class="tab-pane fade show active"
+                 id="categories"
+                 role="tabpanel"
+                 aria-labelledby="categories-tab">
+                 <!-- Search Section for Categories -->
+                 <div class="search-card">
+                    <MudGrid Spacing="3" Justify="Justify.SpaceBetween">
+                       <MudItem xs="12" md="8">
+                          <MudTextField @bind-Value="Filter"
+                             Label="Buscar categorías"
+                             Variant="Variant.Outlined"
+                             Adornment="Adornment.Start"
+                             AdornmentIcon="@Icons.Material.Filled.Search"
+                             FullWidth="true"
+                             OnKeyUp="HandleKeyPress"
+                             Placeholder="Ingrese el nombre de la categoría..." />
+                       </MudItem>
+                       <MudItem xs="12" md="4" Class="d-flex align-items-center gap-2">
+                          <MudButton Variant="Variant.Filled"
+                             Color="Color.Info"
+                             StartIcon="@Icons.Material.Filled.FilterList"
+                             FullWidth="true"
+                             OnClick="ApplyFilterAsync">
+                             Filtrar
+                          </MudButton>
+                          <MudButton Variant="Variant.Outlined"
+                             Color="Color.Error"
+                             StartIcon="@Icons.Material.Filled.Clear"
+                             FullWidth="true"
+                             OnClick="CleanFilterAsync">
+                             Limpiar
+                          </MudButton>
+                       </MudItem>
+                    </MudGrid>
+                 </div>
+                 <!-- Categories Grid -->
+                 <MudGrid Class="mt-3">
+                    @foreach (var category in categories)
+                    {
+                    <MudItem xs="12" md="6" lg="4">
+                       <div class="category-card">
+                          <div class="category-name">
+                             @{
+                                var categoryImageUrl = ImageUrlHelper.GetCategoryImageUrl(category);
+                             }
+                             @if (categoryImageUrl != "/images/no-image.png")
+                             {
+                             <img src="@categoryImageUrl"
+                                style="width: 45px; height: 45px; border-radius: 10px; object-fit: cover;"
+                                alt="@category.Name" />
+                             }
+                             else
+                             {
+                             <div class="category-icon">
+                                <MudIcon Icon="@Icons.Material.Filled.Label" />
+                             </div>
+                             }
+                             <div style="flex: 1;">
+                                <div>@category.Name</div>
+                                <div style="display: flex; gap: 8px; margin-top: 4px;">
+                                   <span class="stats-badge" style="background: #e3f2fd; color: #1976d2;">
+                                      <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Style="font-size: 14px;" /> @category.SubCategoriesNumber Subcategorías
+                                   </span>
+                                   <span class="stats-badge">
+                                      <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" Style="font-size: 14px;" /> @category.ProductCategoriesNumber Productos
+                                   </span>
+                                </div>
+                             </div>
+                          </div>
+                          <div class="category-actions">
+                             <MudButton Variant="Variant.Filled"
+                                Color="Color.Info"
+                                StartIcon="@Icons.Material.Filled.Visibility"
+                                Size="Size.Small"
+                                OnClick="@(() => ShowDetailModal(category.Id))">
+                                Ver
+                             </MudButton>
+                             <MudButton Variant="Variant.Filled"
+                                Color="Color.Warning"
+                                StartIcon="@Icons.Material.Filled.Edit"
+                                Size="Size.Small"
+                                OnClick="@(() => ShowModal(category.Id, true))">
+                                Editar
+                             </MudButton>
+                             <MudButton Variant="Variant.Filled"
+                                Color="Color.Error"
+                                StartIcon="@Icons.Material.Filled.Delete"
+                                Size="Size.Small"
+                                OnClick="@(() => Delete(category.Id))">
+                                Eliminar
+                             </MudButton>
+                          </div>
+                       </div>
+                    </MudItem>
+                    }
+                 </MudGrid>
+              </div>
+
+              <div class="tab-pane fade"
+                 id="subcategories"
+                 role="tabpanel"
+                 aria-labelledby="subcategories-tab">
+                  <!-- Search Section for SubCategories -->
+                  <div class="search-card">
+                     <MudGrid Spacing="3" Justify="Justify.SpaceBetween">
+                        <MudItem xs="12" md="8">
+                           <MudTextField @bind-Value="SubCategoryFilter"
+                              Label="Buscar subcategorías"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              FullWidth="true"
+                              OnKeyUp="HandleSubCategoryKeyPress"
+                              Placeholder="Ingrese el nombre de la subcategoría..." />
+                        </MudItem>
+                        <MudItem xs="12" md="4" Class="d-flex align-items-center gap-2">
+                           <MudButton Variant="Variant.Filled"
+                              Color="Color.Info"
+                              StartIcon="@Icons.Material.Filled.FilterList"
+                              FullWidth="true"
+                              OnClick="ApplySubCategoryFilterAsync">
+                              Filtrar
+                           </MudButton>
+                           <MudButton Variant="Variant.Outlined"
+                              Color="Color.Error"
+                              StartIcon="@Icons.Material.Filled.Clear"
+                              FullWidth="true"
+                              OnClick="CleanSubCategoryFilterAsync">
+                              Limpiar
+                           </MudButton>
+                        </MudItem>
+                     </MudGrid>
+                  </div>
+                  <!-- SubCategories Grid -->
+                  <MudGrid Class="mt-3">
+                     @if (allSubCategories != null)
+                     {
+                     @foreach (var subCategory in allSubCategories)
+                     {
+                     <MudItem xs="12" md="6" lg="4">
+                        <div class="category-card">
+                           <div class="category-name">
+                              @{
+                                 var subCategoryImageUrl = ImageUrlHelper.GetSubCategoryImageUrl(subCategory);
+                              }
+                              @if (subCategoryImageUrl != "/images/no-image.png")
+                              {
+                              <img src="@subCategoryImageUrl"
+                                 style="width: 45px; height: 45px; border-radius: 10px; object-fit: cover;"
+                                 alt="@subCategory.Name" />
+                              }
+                              else
+                              {
+                              <div class="category-icon" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
+                                 <MudIcon Icon="@Icons.Material.Filled.Label" Color="Color.Surface" />
+                              </div>
+                              }
+                              <div style="flex: 1;">
+                                 <div>@subCategory.Name</div>
+                                 <span class="stats-badge">
+                                 @subCategory.ProductSubCategoriesNumber Productos
+                                 </span>
+                                 <span class="stats-badge" style="background: #e3f2fd; color: #1976d2;">
+                                 Categoría: @subCategory.Category?.Name
+                                 </span>
+                              </div>
+                           </div>
+                           <div class="category-actions">
+                              <MudButton Variant="Variant.Filled"
+                                 Color="Color.Warning"
+                                 StartIcon="@Icons.Material.Filled.Edit"
+                                 Size="Size.Small"
+                                 OnClick="@(() => ShowEditSubCategoryModal(subCategory.Id))">
+                                 Editar
+                              </MudButton>
+                              <MudButton Variant="Variant.Filled"
+                                 Color="Color.Error"
+                                 StartIcon="@Icons.Material.Filled.Delete"
+                                 Size="Size.Small"
+                                 OnClick="@(() => DeleteSubCategory(subCategory.Id))">
+                                 Eliminar
+                              </MudButton>
+                           </div>
+                        </div>
+                     </MudItem>
+                     }
+                     }
+                  </MudGrid>
+               </div>
+            </div>
+        </div>
+
+        <!-- Modal Crear Categoría -->
+        <Modal @ref="modalCreate"
+               Title="Nueva Categoría"
+               IsVerticallyCentered="true"
+               Size="BlazorBootstrap.ModalSize.ExtraLarge"
+               HeaderCssClass="modal-header-gradient">
+            <BodyTemplate>
+                <CategoryCreate @ref="categoryCreateRef" OnSuccessCallback="OnCreateSuccess" />
+            </BodyTemplate>
+            <FooterTemplate>
+                <Button Color="ButtonColor.Primary" @onclick="@(async () => await categoryCreateRef.CreateAsync())">
+                    <i class="oi oi-check"></i> Guardar
+                </Button>
+                <Button Color="ButtonColor.Secondary" @onclick="CloseCreateModal">
+                    <i class="oi oi-x"></i> Cancelar
+                </Button>
+            </FooterTemplate>
+        </Modal>
+
+        <!-- Modal Editar Categoría -->
+        <Modal @ref="modalEdit"
+               Title="Editar Categoría"
+               IsVerticallyCentered="true"
+               Size="BlazorBootstrap.ModalSize.ExtraLarge"
+               HeaderCssClass="modal-header-gradient">
+            <BodyTemplate>
+                <CategoryEdit @ref="categoryEditRef" CategoryId="@selectedCategoryId" />
+            </BodyTemplate>
+            <FooterTemplate>
+                <Button Color="ButtonColor.Secondary" @onclick="OnHideEditModalClick">
+                    <i class="oi oi-x"></i> Cancelar
+                </Button>
+                <Button Color="ButtonColor.Primary" @onclick="OnUpdateClick">
+                    <i class="oi oi-check"></i> Actualizar Categoría
+                </Button>
+            </FooterTemplate>
+        </Modal>
+
+        <!-- Modal Crear Subcategoría -->
+        <Modal @ref="modalSubCategory"
+               Title="Nueva Subcategoría"
+               IsVerticallyCentered="true"
+               Size="BlazorBootstrap.ModalSize.ExtraLarge"
+               HeaderCssClass="modal-header-gradient">
+            <BodyTemplate>
+                <SubCategoryCreate @ref="subCategoryCreateRef" OnSuccessCallback="OnSubCategoryCreateSuccess" />
+            </BodyTemplate>
+            <FooterTemplate>
+                <Button Color="ButtonColor.Primary" @onclick="@(async () => await subCategoryCreateRef.CreateAsync())">
+                    <i class="oi oi-check"></i> Guardar
+                </Button>
+                <Button Color="ButtonColor.Secondary" @onclick="CloseSubCategoryModal">
+                    <i class="oi oi-x"></i> Cancelar
+                </Button>
+            </FooterTemplate>
+        </Modal>
+
+        <!-- Modal Detalle de Categoría -->
+        <Modal @ref="modalDetail"
+               Title="@($"Detalle de Categoría: {categoryDetail?.Name}")"
+               IsVerticallyCentered="true"
+               Size="BlazorBootstrap.ModalSize.ExtraLarge"
+               HeaderCssClass="modal-header-gradient">
+            <BodyTemplate>
+                @if (categoryDetail != null)
+                {
+                    <div class="container-fluid">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card shadow-sm">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><MudIcon Icon="@Icons.Material.Filled.Info" /> Información General</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="text-center mb-3">
+                                            @{
+                                                var detailCategoryImageUrl = ImageUrlHelper.GetCategoryImageUrl(categoryDetail);
+                                            }
+                                            @if (detailCategoryImageUrl != "/images/no-image.png")
+                                            {
+                                                <img src="@detailCategoryImageUrl"
+                                                     style="width: 150px; height: 150px; border-radius: 15px; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"
+                                                     alt="@categoryDetail.Name" />
+                                            }
+                                            else
+                                            {
+                                                <div style="width: 150px; height: 150px; background: #e3f2fd; border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Primary" />
+                                                </div>
+                                            }
+                                        </div>
+                                        <h4 class="text-center mb-3">@categoryDetail.Name</h4>
+                                        <div class="d-flex justify-content-around">
+                                            <div class="text-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Success" />
+                                                <p class="mb-0"><strong>@categoryDetail.ProductCategoriesNumber</strong></p>
+                                                <small class="text-muted">Productos</small>
+                                            </div>
+                                            <div class="text-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Category" Color="Color.Info" />
+                                                <p class="mb-0"><strong>@categoryDetail.SubCategoriesNumber</strong></p>
+                                                <small class="text-muted">Subcategorías</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card shadow-sm">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0"><MudIcon Icon="@Icons.Material.Filled.Category" /> Subcategorías</h5>
+                                    </div>
+                                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                                        @if (categoryDetail.SubCategories != null && categoryDetail.SubCategories.Any())
+                                        {
+                                            <div class="list-group">
+                                                @foreach (var subCategory in categoryDetail.SubCategories)
+                                                {
+                                                    <div class="list-group-item d-flex align-items-center gap-3 mb-2" style="border-radius: 8px; border: 1px solid #e0e0e0;">
+                                                        @{
+                                                            var detailSubCategoryImageUrl = ImageUrlHelper.GetSubCategoryImageUrl(subCategory);
+                                                        }
+                                                        @if (detailSubCategoryImageUrl != "/images/no-image.png")
+                                                        {
+                                                            <img src="@detailSubCategoryImageUrl"
+                                                                 style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;"
+                                                                 alt="@subCategory.Name" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <div style="width: 50px; height: 50px; background: #f5f5f5; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                                                <MudIcon Icon="@Icons.Material.Filled.Label" Color="Color.Default" Size="Size.Small" />
+                                                            </div>
+                                                        }
+                                                        <div class="flex-grow-1">
+                                                            <h6 class="mb-0">@subCategory.Name</h6>
+                                                            <small class="text-muted">@subCategory.ProductSubCategoriesNumber productos</small>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center py-5">
+                                                <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Style="opacity: 0.3;" />
+                                                <p class="text-muted mt-2">No hay subcategorías asociadas</p>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </BodyTemplate>
+            <FooterTemplate>
+                <Button Color="ButtonColor.Secondary" @onclick="OnHideDetailModalClick">
+                    <i class="oi oi-x"></i> Cerrar
+                </Button>
+            </FooterTemplate>
+        </Modal>
+
+        <!-- Modal Editar Subcategoría -->
+        <Modal @ref="modalEditSubCategory"
+               Title="Editar Subcategoría"
+               IsVerticallyCentered="true"
+               Size="BlazorBootstrap.ModalSize.ExtraLarge"
+               HeaderCssClass="modal-header-gradient">
+            <BodyTemplate>
+                <SubCategoryEdit @ref="subCategoryEditRef" SubCategoryId="@selectedSubCategoryId" />
+            </BodyTemplate>
+            <FooterTemplate>
+                <Button Color="ButtonColor.Secondary" @onclick="OnHideEditSubCategoryModalClick">
+                    <i class="oi oi-x"></i> Cancelar
+                </Button>
+                <Button Color="ButtonColor.Primary" @onclick="OnUpdateSubCategoryClick">
+                    <i class="oi oi-check"></i> Actualizar Subcategoría
+                </Button>
+            </FooterTemplate>
+        </Modal>
+
+    </MudContainer>
 }
 
 @code {
     public List<Category>? categories { get; set; }
+    public List<SubCategory>? allSubCategories { get; set; }
+    private List<SubCategory>? filteredSubCategories { get; set; }
     private int currentPage = 1;
     private int totalPages;
-
-    [CascadingParameter]
-    IModalService Modal { get; set; } = default!;
-
+    private int activeTabIndex = 0;
+    private bool loading = true;
+    private int subCategoriesCount = 0;
 
     [Parameter]
     [SupplyParameterFromQuery]
@@ -83,28 +751,207 @@ else
     [SupplyParameterFromQuery]
     public string Filter { get; set; } = "";
 
-    protected async override Task OnInitializedAsync()
+    public string SubCategoryFilter { get; set; } = "";
+
+    private Modal modalCreate = default!;
+    private Modal modalEdit = default!;
+    private Modal modalSubCategory = default!;
+    private Modal modalDetail = default!;
+    private Modal modalEditSubCategory = default!;
+    private CategoryCreate categoryCreateRef = default!;
+    private CategoryEdit categoryEditRef = default!;
+    private SubCategoryCreate subCategoryCreateRef = default!;
+    private SubCategoryEdit subCategoryEditRef = default!;
+    private int selectedCategoryId = 0;
+    private int selectedSubCategoryId = 0;
+    private Category? categoryDetail = null;
+    private bool firstRender = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            this.firstRender = false;
+            loading = true;
+            StateHasChanged();
+
+            // Cargar categorías y contador de subcategorías en paralelo
+            await Task.WhenAll(
+                LoadAsync(),
+                LoadSubCategoriesCountAsync()
+            );
+
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSubCategoriesTabClick()
+    {
+        // Cargar subcategorías solo si no se han cargado antes (lazy loading)
+        if (allSubCategories == null)
+        {
+            await LoadSubCategoriesAsync();
+        }
+    }
+
+    private async Task OnHideEditModalClick()
+    {
+        await modalEdit?.HideAsync();
         await LoadAsync();
+    }
+
+    private async Task OnCreateSuccess()
+    {
+        // Recarga los datos cuando la categoría se crea exitosamente
+        await LoadAsync();
+    }
+
+    private async Task CloseCreateModal()
+    {
+        if (categoryCreateRef != null)
+        {
+            categoryCreateRef.ResetForm();
+        }
+        await modalCreate?.HideAsync();
+    }
+
+    private async Task CloseSubCategoryModal()
+    {
+        if (subCategoryCreateRef != null)
+        {
+            subCategoryCreateRef.ResetForm();
+        }
+        await modalSubCategory?.HideAsync();
+    }
+
+    private async Task OnUpdateClick()
+    {
+        if (categoryEditRef != null)
+        {
+            var success = await categoryEditRef.EditAsync();
+            // Solo cerrar después de que EditAsync() se haya completado exitosamente
+            if (success)
+            {
+                await modalEdit?.HideAsync();
+                await LoadAsync();
+            }
+        }
+    }
+
+    private async Task OnSubCategoryCreateSuccess()
+    {
+        // Recarga los datos cuando la subcategoría se crea exitosamente
+        await LoadAsync();
+        await LoadSubCategoriesAsync();
     }
 
     private async Task ShowModal(int id = 0, bool isEdit = false)
     {
-        IModalReference modalReference;
+        // Cerrar el drawer antes de mostrar el modal
+        await JS.InvokeVoidAsync("eval", @"
+            const drawerElement = document.querySelector('.mud-drawer');
+            if (drawerElement && drawerElement.classList.contains('mud-drawer-open')) {
+                const toggleButton = document.querySelector('.mud-app-bar .mud-icon-button');
+                if (toggleButton) {
+                    toggleButton.click();
+                }
+            }
+        ");
 
         if (isEdit)
         {
-            modalReference = Modal.Show<CategoryEdit>(string.Empty, new ModalParameters().Add("CategoryId", id));
+            selectedCategoryId = id;
+            await modalEdit?.ShowAsync();
         }
         else
         {
-            modalReference = Modal.Show<CategoryCreate>();
+            // Resetear el formulario cuando se abre el modal de creación
+            if (categoryCreateRef != null)
+            {
+                categoryCreateRef.ResetForm();
+            }
+            await modalCreate?.ShowAsync();
         }
+    }
 
-        var result = await modalReference.Result;
-        if (result.Confirmed)
+    private async Task ShowSubCategoryModal()
+    {
+        // Cerrar el drawer antes de mostrar el modal
+        await JS.InvokeVoidAsync("eval", @"
+            const drawerElement = document.querySelector('.mud-drawer');
+            if (drawerElement && drawerElement.classList.contains('mud-drawer-open')) {
+                const toggleButton = document.querySelector('.mud-app-bar .mud-icon-button');
+                if (toggleButton) {
+                    toggleButton.click();
+                }
+            }
+        ");
+
+        // Resetear el formulario cuando se abre el modal de creación
+        if (subCategoryCreateRef != null)
         {
-            await LoadAsync();
+            subCategoryCreateRef.ResetForm();
+        }
+        await modalSubCategory?.ShowAsync();
+    }
+
+    private async Task ShowDetailModal(int id)
+    {
+        // Cargar los detalles completos de la categoría con sus subcategorías
+        var responseHttp = await repository.Get<Category>($"api/categories/{id}");
+        if (responseHttp.Error)
+        {
+            var message = await responseHttp.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            return;
+        }
+        categoryDetail = responseHttp.Response;
+        await modalDetail?.ShowAsync();
+    }
+
+    private async Task OnHideDetailModalClick()
+    {
+        await modalDetail?.HideAsync();
+        categoryDetail = null;
+    }
+
+    private async Task ShowEditSubCategoryModal(int id)
+    {
+        // Cerrar el drawer antes de mostrar el modal
+        await JS.InvokeVoidAsync("eval", @"
+            const drawerElement = document.querySelector('.mud-drawer');
+            if (drawerElement && drawerElement.classList.contains('mud-drawer-open')) {
+                const toggleButton = document.querySelector('.mud-app-bar .mud-icon-button');
+                if (toggleButton) {
+                    toggleButton.click();
+                }
+            }
+        ");
+
+        selectedSubCategoryId = id;
+        await modalEditSubCategory?.ShowAsync();
+    }
+
+    private async Task OnHideEditSubCategoryModalClick()
+    {
+        await modalEditSubCategory?.HideAsync();
+        await LoadAsync();
+        await LoadSubCategoriesAsync();
+    }
+
+    private async Task OnUpdateSubCategoryClick()
+    {
+        if (subCategoryEditRef != null)
+        {
+            var success = await subCategoryEditRef.EditAsync();
+            // Solo cerrar después de que EditAsync() se haya completado exitosamente
+            if (success)
+            {
+                await modalEditSubCategory?.HideAsync();
+                await LoadAsync();
+                await LoadSubCategoriesAsync();
+            }
         }
     }
 
@@ -137,10 +984,30 @@ else
 
         try
         {
-            var responseHppt = await repository.Get<List<Category>>(url1);
-            var responseHppt2 = await repository.Get<int>(url2);
-            categories = responseHppt.Response!;
-            totalPages = responseHppt2.Response!;
+            var task1 = repository.Get<List<Category>>(url1);
+            var task2 = repository.Get<int>(url2);
+
+            await Task.WhenAll(task1, task2);
+
+            var responseCategories = task1.Result;
+            var responseTotalPages = task2.Result;
+
+            if (responseCategories.Error)
+            {
+                var message = await responseCategories.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                return;
+            }
+
+            if (responseTotalPages.Error)
+            {
+                var message = await responseTotalPages.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                return;
+            }
+
+            categories = responseCategories.Response;
+            totalPages = responseTotalPages.Response;
         }
         catch (Exception ex)
         {
@@ -181,6 +1048,14 @@ else
         }
         else
         {
+            var toast2 = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.BottomRight,
+                ShowConfirmButton = false,
+                Timer = 5000
+            });
+            await toast2.FireAsync(icon: SweetAlertIcon.Success, message: "Eliminada correctamente!");
             await LoadAsync();
         }
     }
@@ -191,10 +1066,116 @@ else
         await ApplyFilterAsync();
     }
 
+    // SubCategories Methods
+    private async Task LoadSubCategoriesCountAsync()
+    {
+        // Solo cargar el contador, no todas las subcategorías
+        var response = await repository.Get<int>("/api/subcategories/count");
+        if (!response.Error)
+        {
+            subCategoriesCount = response.Response;
+        }
+    }
+
+    private async Task LoadSubCategoriesAsync()
+    {
+        // Cargar con paginación grande para obtener todas, pero sin traer datos pesados
+        var response = await repository.Get<List<SubCategory>>("/api/subcategories?RecordsNumber=1000");
+        if (response.Error)
+        {
+            var message = await response.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            return;
+        }
+
+        allSubCategories = response.Response;
+        subCategoriesCount = allSubCategories?.Count ?? 0; // Actualizar el contador
+    }
+
+    private async Task ApplySubCategoryFilterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SubCategoryFilter))
+        {
+            await LoadSubCategoriesAsync();
+            return;
+        }
+
+        allSubCategories = allSubCategories?
+            .Where(x => x.Name.ToLower().Contains(SubCategoryFilter.ToLower()))
+            .ToList();
+    }
+
+    private async Task CleanSubCategoryFilterAsync()
+    {
+        SubCategoryFilter = string.Empty;
+        await LoadSubCategoriesAsync();
+    }
+
+    private async Task HandleSubCategoryKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplySubCategoryFilterAsync();
+        }
+    }
+
+    private async Task DeleteSubCategory(int subCategoryId)
+    {
+        var result = await sweetAlertService.FireAsync(new SweetAlertOptions
+        {
+            Title = "Confirmación",
+            Text = "¿Está seguro que quiere borrar esta subcategoría?",
+            Icon = SweetAlertIcon.Question,
+            ShowCancelButton = true
+        });
+
+        var confirm = string.IsNullOrEmpty(result.Value);
+
+        if (confirm)
+        {
+            return;
+        }
+
+        var responseHTTP = await repository.Delete($"api/subcategories/{subCategoryId}");
+
+        if (responseHTTP.Error)
+        {
+            if (responseHTTP.HttpResponseMessage.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                navigationManager.NavigateTo("/categories");
+            }
+            else
+            {
+                var mensajeError = await responseHTTP.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", mensajeError, SweetAlertIcon.Error);
+            }
+        }
+        else
+        {
+            var toast = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.TopEnd,
+                ShowConfirmButton = false,
+                Timer = 5000
+            });
+            await toast.FireAsync(icon: SweetAlertIcon.Success, message: "Subcategoría eliminada correctamente!");
+            await LoadSubCategoriesAsync();
+        }
+    }
+
     private async Task ApplyFilterAsync()
     {
         int page = 1;
         await LoadAsync(page);
         await SelectedPageAsync(page);
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplyFilterAsync();
+        }
     }
 }

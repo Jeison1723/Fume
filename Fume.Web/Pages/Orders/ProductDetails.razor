@@ -1,0 +1,460 @@
+@page "/orders/details/{ProductId:int}"
+@inject IRepository repository
+@inject NavigationManager navigationManager
+@inject SweetAlertService sweetAlertService
+@inject Fume.Web.Services.CartService cartService
+@using Fume.Web.Helpers
+@using MudBlazor
+@layout MainLayout
+
+<style>
+    .product-details-header {
+        background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    }
+
+    .breadcrumb-custom {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 10px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .breadcrumb-custom a {
+        color: white;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .breadcrumb-custom a:hover {
+        text-decoration: underline;
+    }
+
+    .main-image-container {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        height: 450px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #e0e0e0;
+    }
+
+    .main-image-container img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .thumbnail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .thumbnail-item {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .thumbnail-item:hover {
+        border-color: #2196F3;
+        transform: scale(1.05);
+    }
+
+    .thumbnail-item.active {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    }
+
+    .thumbnail-item img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .price-tag {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #27ae60;
+        margin: 15px 0;
+    }
+
+    .stock-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .stock-badge.in-stock {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .stock-badge.low-stock {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .stock-badge.out-of-stock {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .quantity-selector-custom {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .feature-card {
+        background: #f8f9fa;
+        border-left: 4px solid #2196F3;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+
+    .feature-card .feature-icon {
+        font-size: 1.5rem;
+        margin-right: 10px;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <!-- Header with Breadcrumb -->
+    <div class="product-details-header">
+        <div class="breadcrumb-custom">
+            <a href="/">Inicio</a> /
+            <a href="/">Catálogo</a> /
+            <span>@(Product?.Name ?? "Producto")</span>
+        </div>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Color="Color.Surface"
+                   OnClick="GoBack"
+                   Style="color: white; border-color: white;">
+            Volver al Catálogo
+        </MudButton>
+    </div>
+
+    @if (Product is null)
+    {
+        <div class="text-center py-5">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <p class="mt-3">Cargando producto...</p>
+        </div>
+    }
+    else
+    {
+        <MudGrid>
+            <!-- Columna Izquierda: Imágenes -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <div class="main-image-container">
+                        @if (SelectedImageId.HasValue)
+                        {
+                            var imageUrl = ImageUrlHelper.GetProductImageUrl(Product.ProductImages.First(x => x.Id == SelectedImageId.Value));
+                            <img src="@imageUrl" alt="@Product.Name" />
+                        }
+                        else if (Product.ProductImages != null && Product.ProductImages.Any())
+                        {
+                            var imageUrl = ImageUrlHelper.GetProductImageUrl(Product.ProductImages.First());
+                            <img src="@imageUrl" alt="@Product.Name" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Color="Color.Default" Style="font-size: 5rem;" />
+                        }
+                    </div>
+
+                    @if (Product.ProductImages != null && Product.ProductImages.Any())
+                    {
+                        <div class="thumbnail-grid">
+                            @foreach (var image in Product.ProductImages)
+                            {
+                                var imageUrl = ImageUrlHelper.GetProductImageUrl(image);
+                                <div class="thumbnail-item @(image.Id == SelectedImageId ? "active" : "")"
+                                     @onclick="() => SelectImage(image.Id)">
+                                    <img src="@imageUrl" alt="Thumbnail" />
+                                </div>
+                            }
+                        </div>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Columna Derecha: Información del Producto -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h4" GutterBottom="true">@Product.Name</MudText>
+
+                    <MudRating SelectedValue="5" ReadOnly="true" />
+                    <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-3">125 reseñas</MudText>
+
+                    <MudDivider Class="my-3" />
+
+                    <div class="price-tag">@FormatHelper.FormatPrice(Product.Price)</div>
+
+                    <MudDivider Class="my-3" />
+
+                    <!-- Stock Status -->
+                    @if (Product.Stock > 0)
+                    {
+                        @if (Product.Stock > 10)
+                        {
+                            <div class="stock-badge in-stock">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
+                                <span>En stock (@Product.Stock unidades)</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stock-badge low-stock">
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+                                <span>Stock bajo (@Product.Stock unidades)</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="stock-badge out-of-stock">
+                            <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" />
+                            <span>Agotado</span>
+                        </div>
+                    }
+
+                    <MudText Typo="Typo.body1" Class="my-4">
+                        @Product.Description
+                    </MudText>
+
+                    <!-- Quantity Selector -->
+                    <div class="quantity-selector-custom mb-4">
+                        <MudText Typo="Typo.body1" Style="font-weight: 600;">Cantidad:</MudText>
+                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
+                            <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                           OnClick="DecreaseQuantity"
+                                           Disabled="@(Quantity <= 1)" />
+                            <MudButton Style="min-width: 60px; font-weight: 600;">@Quantity</MudButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           OnClick="IncreaseQuantity"
+                                           Disabled="@(Quantity >= Product.Stock)" />
+                        </MudButtonGroup>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <MudGrid Class="mb-4">
+                        <MudItem xs="12" md="8">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Size="Size.Large"
+                                       StartIcon="@Icons.Material.Filled.ShoppingCart"
+                                       OnClick="AddToCartAsync"
+                                       Disabled="@(Product.Stock <= 0 || isLoading)">
+                                @if (isLoading)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                    <span class="ml-2">Procesando...</span>
+                                }
+                                else
+                                {
+                                    <span>Agregar al Carrito</span>
+                                }
+                            </MudButton>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Size="Size.Large"
+                                       StartIcon="@Icons.Material.Filled.FavoriteBorder"
+                                       OnClick="AddToWishlist">
+                                Guardar
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Product Features -->
+                    <MudText Typo="Typo.h6" GutterBottom="true" Class="mt-4">Información adicional</MudText>
+
+                    <div class="feature-card">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Primary" Class="feature-icon" />
+                        <strong>Envío gratis</strong> en compras mayores a $100
+                    </div>
+
+                    <div class="feature-card">
+                        <MudIcon Icon="@Icons.Material.Filled.Cached" Color="Color.Primary" Class="feature-icon" />
+                        <strong>30 días</strong> para devolver sin preguntas
+                    </div>
+
+                    <div class="feature-card">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" Class="feature-icon" />
+                        <strong>Garantía</strong> del fabricante de 1 año
+                    </div>
+
+                    <div class="feature-card">
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Primary" Class="feature-icon" />
+                        <strong>Múltiples formas</strong> de pago disponibles
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int ProductId { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = null!;
+
+    private Product? Product { get; set; }
+    private int? SelectedImageId { get; set; }
+    private int Quantity { get; set; } = 1;
+    private bool isLoading = false;
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckIsAuthenticatedAsync();
+        await LoadProductAsync();
+    }
+
+    private async Task CheckIsAuthenticatedAsync()
+    {
+        var authenticationState = await authenticationStateTask;
+        isAuthenticated = authenticationState.User.Identity!.IsAuthenticated;
+    }
+
+    private async Task LoadProductAsync()
+    {
+        try
+        {
+            var response = await repository.Get<Product>($"/api/products/{ProductId}");
+            if (!response.Error)
+            {
+                Product = response.Response;
+                if (Product?.ProductImages != null && Product.ProductImages.Any())
+                {
+                    SelectedImageId = Product.ProductImages.First().Id;
+                }
+            }
+            else
+            {
+                await sweetAlertService.FireAsync("Error", "No se pudo cargar el producto", SweetAlertIcon.Error);
+                navigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            await sweetAlertService.FireAsync("Error", ex.Message, SweetAlertIcon.Error);
+            navigationManager.NavigateTo("/");
+        }
+    }
+
+    private void SelectImage(int imageId)
+    {
+        SelectedImageId = imageId;
+    }
+
+    private void IncreaseQuantity()
+    {
+        if (Product != null && Quantity < Product.Stock)
+        {
+            Quantity++;
+        }
+    }
+
+    private void DecreaseQuantity()
+    {
+        if (Quantity > 1)
+        {
+            Quantity--;
+        }
+    }
+
+    private async Task AddToCartAsync()
+    {
+        if (!isAuthenticated)
+        {
+            navigationManager.NavigateTo("/Login");
+            var toast = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.BottomEnd,
+                ShowConfirmButton = false,
+                Timer = 5000,
+                TimerProgressBar = true
+            });
+            await toast.FireAsync(icon: SweetAlertIcon.Error, message: "Debes iniciar sesión para agregar productos al carrito.");
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            // Usar el CartService para agregar al carrito
+            var success = await cartService.AddToCartAsync(ProductId, Quantity);
+
+            if (success)
+            {
+                // Resetear la cantidad a 1 después de agregar
+                Quantity = 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            var toast = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.BottomEnd,
+                ShowConfirmButton = false,
+                Timer = 5000
+            });
+            await toast.FireAsync(icon: SweetAlertIcon.Error, message: "Error: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddToWishlist()
+    {
+        var toast = sweetAlertService.Mixin(new SweetAlertOptions
+        {
+            Toast = true,
+            Position = SweetAlertPosition.BottomEnd,
+            ShowConfirmButton = false,
+            Timer = 3000,
+            TimerProgressBar = true
+        });
+        await toast.FireAsync(icon: SweetAlertIcon.Info, message: "Producto guardado en tu lista de deseos");
+    }
+
+    private void GoBack()
+    {
+        navigationManager.NavigateTo("/");
+    }
+}

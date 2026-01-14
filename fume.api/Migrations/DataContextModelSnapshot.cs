@@ -163,6 +163,16 @@ namespace fume.api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("Image")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -207,6 +217,10 @@ namespace fume.api.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DocumentPattern")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -284,6 +298,9 @@ namespace fume.api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<byte[]>("Imagefile")
                         .IsRequired()
                         .HasColumnType("varbinary(max)");
@@ -296,6 +313,29 @@ namespace fume.api.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("ProductImages");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.ProductSubCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubCategoryId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SubCategoryId");
+
+                    b.ToTable("ProductSubCategories");
                 });
 
             modelBuilder.Entity("fume.shared.Enttities.State", b =>
@@ -320,6 +360,99 @@ namespace fume.api.Migrations
                         .IsUnique();
 
                     b.ToTable("States");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.SubCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("Image")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SubCategories");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.Suggestion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Suggestions");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.TemporalSale", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<float>("Quantity")
+                        .HasColumnType("real");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("TemporalSales");
                 });
 
             modelBuilder.Entity("fume.shared.Enttities.User", b =>
@@ -510,6 +643,25 @@ namespace fume.api.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("fume.shared.Enttities.ProductSubCategory", b =>
+                {
+                    b.HasOne("fume.shared.Enttities.Product", "Products")
+                        .WithMany("ProductSubCategories")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("fume.shared.Enttities.SubCategory", "SubCategory")
+                        .WithMany("ProductSubCategories")
+                        .HasForeignKey("SubCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Products");
+
+                    b.Navigation("SubCategory");
+                });
+
             modelBuilder.Entity("fume.shared.Enttities.State", b =>
                 {
                     b.HasOne("fume.shared.Enttities.Country", "country")
@@ -519,6 +671,34 @@ namespace fume.api.Migrations
                         .IsRequired();
 
                     b.Navigation("country");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.SubCategory", b =>
+                {
+                    b.HasOne("fume.shared.Enttities.Category", "Category")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.TemporalSale", b =>
+                {
+                    b.HasOne("fume.shared.Enttities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("fume.shared.Enttities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("fume.shared.Enttities.User", b =>
@@ -535,6 +715,8 @@ namespace fume.api.Migrations
             modelBuilder.Entity("fume.shared.Enttities.Category", b =>
                 {
                     b.Navigation("ProductCategories");
+
+                    b.Navigation("SubCategories");
                 });
 
             modelBuilder.Entity("fume.shared.Enttities.City", b =>
@@ -552,11 +734,18 @@ namespace fume.api.Migrations
                     b.Navigation("ProductCategories");
 
                     b.Navigation("ProductImages");
+
+                    b.Navigation("ProductSubCategories");
                 });
 
             modelBuilder.Entity("fume.shared.Enttities.State", b =>
                 {
                     b.Navigation("Cities");
+                });
+
+            modelBuilder.Entity("fume.shared.Enttities.SubCategory", b =>
+                {
+                    b.Navigation("ProductSubCategories");
                 });
 #pragma warning restore 612, 618
         }

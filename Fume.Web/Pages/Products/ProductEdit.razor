@@ -10,19 +10,32 @@
 }
 else
 {
-    <ProductForm @ref="productForm" ProductDTO="productDTO" SelectedCategories="selectedCategories" NonSelectedCategories="nonSelectedCategories" OnValidSubmit="SaveChangesAsync" ReturnAction="Return" IsEdit=true AddImageAction="AddImageAsync" RemoveImageAction="RemoveImageAsyc" />
+    <ProductForm @ref="productForm"
+                 ProductDTO="productDTO"
+                 SelectedCategories="selectedCategories"
+                 NonSelectedCategories="nonSelectedCategories"
+                 SelectedSubCategories="selectedSubCategories"
+                 NonSelectedSubCategories="nonSelectedSubCategories"
+                 OnValidSubmit="SaveChangesAsync"
+                 ReturnAction="Return"
+                 IsEdit="true"
+                 AddImageAction="AddImageAsync"
+                 RemoveImageAction="RemoveImageAsyc" />
 }
 
 @code {
     private ProductDTO productDTO = new ProductDTO
         {
             ProductCategoryIds = new List<int>(),
+            ProductSubCategoryIds = new List<int>(),
             ProductImages = new List<string>()
         };
 
     private ProductForm? productForm;
     private List<Category> selectedCategories = new();
     private List<Category> nonSelectedCategories = new();
+    private List<SubCategory> selectedSubCategories = new();
+    private List<SubCategory> nonSelectedSubCategories = new();
     private bool loading = true;
     private Product? product;
 
@@ -33,14 +46,54 @@ else
     {
         await LoadProductAsync();
         await LoadCategoriesAsync();
+        await LoadSubCategoriesAsync();
     }
 
     private async Task AddImageAsync()
     {
+        // Este método se llama después de que ImageSelected ya agregó la imagen
+        // Solo necesitamos forzar un re-render del componente
+        StateHasChanged();
+
+        var toast = sweetAlertService.Mixin(new SweetAlertOptions
+        {
+            Toast = true,
+            Position = SweetAlertPosition.BottomEnd,
+            ShowConfirmButton = false,
+            Timer = 3000,
+            TimerProgressBar = true
+        });
+        await toast.FireAsync(icon: SweetAlertIcon.Success, message: "Imagen agregada. Recuerda guardar los cambios.");
     }
 
     private async Task RemoveImageAsyc()
     {
+        if (productDTO.ProductImages == null || productDTO.ProductImages.Count == 0)
+        {
+            var errorToast = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.BottomEnd,
+                ShowConfirmButton = false,
+                Timer = 3000,
+                TimerProgressBar = true
+            });
+            await errorToast.FireAsync(icon: SweetAlertIcon.Error, message: "No hay imágenes para eliminar.");
+            return;
+        }
+
+        productDTO.ProductImages.RemoveAt(productDTO.ProductImages.Count - 1);
+        StateHasChanged();
+
+        var successToast = sweetAlertService.Mixin(new SweetAlertOptions
+        {
+            Toast = true,
+            Position = SweetAlertPosition.BottomEnd,
+            ShowConfirmButton = false,
+            Timer = 3000,
+            TimerProgressBar = true
+        });
+        await successToast.FireAsync(icon: SweetAlertIcon.Success, message: "Imagen eliminada. Recuerda guardar los cambios.");
     }
 
     private async Task LoadProductAsync()
@@ -71,6 +124,7 @@ else
                 Price = product.Price,
                 Stock = product.Stock,
                 ProductCategoryIds = product.ProductCategories!.Select(x => x.CategoryId).ToList(),
+                ProductSubCategoryIds = product.ProductSubCategories!.Select(x => x.SubCategoryId).ToList(),
                 ProductImages = product.ProductImages!.Select(x => Convert.ToBase64String(x.Imagefile)).ToList()
             };
     }
@@ -104,8 +158,54 @@ else
         loading = false;
     }
 
+    private async Task LoadSubCategoriesAsync()
+    {
+        loading = true;
+        var httpResponse = await repository.Get<List<SubCategory>>("/api/subcategories");
+
+        if (httpResponse.Error)
+        {
+            loading = false;
+            var message = await httpResponse.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            return;
+        }
+
+        var subCategories = httpResponse.Response!;
+        foreach (var subCategory in subCategories!)
+        {
+            var found = product!.ProductSubCategories!.FirstOrDefault(x => x.SubCategoryId == subCategory.Id);
+            if (found == null)
+            {
+                nonSelectedSubCategories.Add(subCategory);
+            }
+            else
+            {
+                selectedSubCategories.Add(subCategory);
+            }
+        }
+        loading = false;
+    }
+
     private async Task SaveChangesAsync()
     {
+        // Obtener las subcategorías seleccionadas del ProductForm
+        if (productDTO.ProductSubCategoryIds != null && productDTO.ProductSubCategoryIds.Any())
+        {
+            // Cargar todas las subcategorías para obtener sus CategoryId
+            var allSubCategories = selectedSubCategories.Concat(nonSelectedSubCategories).ToList();
+
+            // Obtener las categorías padre de las subcategorías seleccionadas
+            var categoryIds = allSubCategories
+                .Where(sc => productDTO.ProductSubCategoryIds.Contains(sc.Id))
+                .Select(sc => sc.CategoryId)
+                .Distinct()
+                .ToList();
+
+            // Asignar las categorías automáticamente
+            productDTO.ProductCategoryIds = categoryIds;
+        }
+
         var httpResponse = await repository.Put("/api/products", productDTO);
         if (httpResponse.Error)
         {

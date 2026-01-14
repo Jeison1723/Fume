@@ -1,27 +1,222 @@
-﻿@page "/categories/edit/{CategoryId:int}"
 @inject IRepository repository
-@inject NavigationManager navigationManager
 @inject SweetAlertService sweetAlertService
+@using fume.shared.DTOs
 
-<h3>Editar categoría</h3>
+<style>
+    .modal-content-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
 
-@if (category is null)
+    .upload-area {
+        border: 2px dashed #e0e0e0;
+        border-radius: 12px;
+        background-color: #fafafa;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .upload-area:hover {
+        border-color: #667eea;
+        background-color: #f0f0ff;
+    }
+
+    .upload-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background: #667eea;
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+        border: none;
+    }
+
+    .upload-button:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+    }
+
+    .image-preview-container {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        background-color: #fafafa;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+    }
+
+    .image-preview-container img {
+        max-width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+        border-radius: 8px;
+    }
+
+    .no-image-placeholder {
+        color: #999;
+        text-align: center;
+        padding: 40px;
+    }
+
+    @@media (max-width: 768px) {
+        .modal-content-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+</style>
+
+@if (categoryDTO is null)
 {
-    <div class="spinner" />
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
 }
 else
 {
-    <CategoryForm @ref="categoryForm" Category="category" OnValidSubmit="EditAsync" ReturnAction="Return" />
+    <EditForm Model="@categoryDTO" OnValidSubmit="EditAsync">
+        <DataAnnotationsValidator />
+
+        <div class="modal-content-grid">
+            <!-- Columna Izquierda: Formulario -->
+            <div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre de la Categoría</label>
+                    <InputText class="form-control form-control-lg"
+                               @bind-Value="categoryDTO.Name"
+                               placeholder="Ingrese el nombre de la categoría" />
+                    <ValidationMessage For="@(() => categoryDTO.Name)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Imagen de la Categoría</label>
+                    <div class="upload-area">
+                        <InputFile OnChange="OnFileSelected"
+                                   accept=".png,.jpg,.jpeg"
+                                   id="fileInputEdit"
+                                   style="display: none;" />
+
+                        <label for="fileInputEdit" class="upload-button">
+                            <i class="oi oi-cloud-upload"></i> Cambiar Imagen
+                        </label>
+
+                        <p class="text-muted mt-3 mb-0" style="font-size: 0.875rem;">
+                            Formatos: PNG, JPG, JPEG (Máx. 10MB)
+                        </p>
+
+                        @if (!string.IsNullOrEmpty(fileName))
+                        {
+                            <div class="mt-3">
+                                <span class="badge bg-success" style="font-size: 0.9rem; padding: 8px 12px;">
+                                    <i class="oi oi-check"></i> @fileName
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Icono:</label>
+                    <select class="form-control form-control-lg" @bind="categoryDTO.Icon" @bind:event="oninput">
+                        <option value="">-- Seleccionar icono --</option>
+                        <optgroup label="Computadoras">
+                            <option value="Desktop">PC</option>
+                            <option value="Laptop">Laptop</option>
+                            <option value="Tablet">Tablet</option>
+                            <option value="Smartphone">Teléfono</option>
+                        </optgroup>
+                        <optgroup label="Componentes">
+                            <option value="Memory">Memoria</option>
+                            <option value="Storage">Almacenamiento</option>
+                            <option value="Cpu">Procesador</option>
+                            <option value="Gpu">Gráficos</option>
+                            <option value="HardDrive">Disco Duro</option>
+                            <option value="SSD">Disco SSD</option>
+                        </optgroup>
+                        <optgroup label="Periféricos">
+                            <option value="Mouse">Ratón</option>
+                            <option value="Keyboard">Teclado</option>
+                            <option value="Monitor">Monitor</option>
+                            <option value="Headphones">Audífonos</option>
+                            <option value="Speaker">Parlante</option>
+                            <option value="Camera">Cámara</option>
+                            <option value="Printer">Impresora</option>
+                        </optgroup>
+                        <optgroup label="Red y Conectividad">
+                            <option value="Router">Router</option>
+                            <option value="Wifi">WiFi</option>
+                            <option value="Cable">Cables</option>
+                            <option value="NetworkCheck">Red</option>
+                            <option value="SecurityCamera">Cámara IP</option>
+                        </optgroup>
+                        <optgroup label="Oficina">
+                            <option value="Print">Impresión</option>
+                            <option value="Description">Documentos</option>
+                            <option value="Chair">Muebles</option>
+                            <option value="Lightbulb">Iluminación</option>
+                        </optgroup>
+                        <optgroup label="Software y Servicios">
+                            <option value="Code">Software</option>
+                            <option value="Cloud">Nube</option>
+                            <option value="VpnLock">Seguridad</option>
+                            <option value="Extension">Extensiones</option>
+                        </optgroup>
+                        <optgroup label="Accesorios">
+                            <option value="Backpack">Mochilas</option>
+                            <option value="Cases">Fundas</option>
+                            <option value="DisplaySettings">Soportes</option>
+                            <option value="Settings">Accesorios</option>
+                        </optgroup>
+                    </select>
+
+                    @if (categoryDTO != null && !string.IsNullOrEmpty(categoryDTO.Icon))
+                    {
+                        <div style="margin-top: 12px; padding: 12px; background-color: #f5f5f5; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.9rem; color: #666;">Vista previa:</span>
+                            <MudIcon Icon="@GetCategoryIcon(categoryDTO.Icon)" Color="Color.Primary" Size="Size.Large"></MudIcon>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Vista Previa -->
+            <div>
+                <label class="form-label fw-bold">Vista Previa</label>
+                <div class="image-preview-container">
+                    @if (!string.IsNullOrEmpty(imageUrl))
+                    {
+                        <img src="data:image/png;base64,@imageUrl" alt="Preview" />
+                    }
+                    else
+                    {
+                        <div class="no-image-placeholder">
+                            <i class="oi oi-image" style="font-size: 4rem; opacity: 0.3;"></i>
+                            <p class="mt-3">No hay imagen seleccionada</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </EditForm>
 }
 
 @code {
-    private Category? category;
-    private CategoryForm? categoryForm;
+    private CategoryDTO? categoryDTO;
+    private string? imageUrl;
+    private string? fileName;
+    private bool isLoading = false;
 
     [CascadingParameter]
-    BlazoredModalInstance BlazoredModal { get; set; } = default!;
-
-
+    public Modal Modal { get; set; } = default!;
 
     [Parameter]
     public int CategoryId { get; set; }
@@ -33,7 +228,8 @@ else
         {
             if (responseHttp.HttpResponseMessage.StatusCode == HttpStatusCode.NotFound)
             {
-                navigationManager.NavigateTo("/categories");
+                await sweetAlertService.FireAsync("Error", "Categoría no encontrada", SweetAlertIcon.Error);
+                await Modal.HideAsync();
                 return;
             }
 
@@ -42,25 +238,224 @@ else
             return;
         }
 
-        category = responseHttp.Response;
-    }
-
-    private async Task EditAsync()
-    {
-        var responseHttp = await repository.Put("/api/categories", category);
-        if (responseHttp.Error)
+        var category = responseHttp.Response;
+        categoryDTO = new CategoryDTO
         {
-            var message = await responseHttp.GetErrorMessageAsync();
-            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
-            return;
+            Id = category.Id,
+            Name = category.Name,
+            Icon = category.Icon,
+            ImageString = category.Image != null && category.Image.Length > 0
+                ? Convert.ToBase64String(category.Image)
+                : null
+        };
+
+        // Cargar imagen existente si hay una
+        if (category?.Image != null && category.Image.Length > 0)
+        {
+            imageUrl = Convert.ToBase64String(category.Image);
+            fileName = "Imagen actual";
         }
-        await BlazoredModal.CloseAsync(ModalResult.Ok());
-        Return();
+
+        StateHasChanged();
     }
 
-    private void Return()
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
-        categoryForm!.FormPostedSuccessfully = true;
-        navigationManager.NavigateTo($"/categories");
+        var file = e.File;
+        if (file != null && categoryDTO != null)
+        {
+            // Validar tamaño
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                await sweetAlertService.FireAsync("Error", "El archivo es demasiado grande. Máximo 10MB.", SweetAlertIcon.Error);
+                return;
+            }
+
+            // Validar tipo
+            var allowedTypes = new[] { "image/png", "image/jpeg", "image/jpg" };
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                await sweetAlertService.FireAsync("Error", "Formato no permitido. Solo PNG, JPG o JPEG.", SweetAlertIcon.Error);
+                return;
+            }
+
+            fileName = file.Name;
+            isLoading = true;
+            StateHasChanged();
+
+            try
+            {
+                // Leer el archivo
+                var buffer = new byte[file.Size];
+                await file.OpenReadStream(maxAllowedSize: 1024 * 1024 * 10).ReadAsync(buffer);
+
+                // Convertir a Base64
+                imageUrl = Convert.ToBase64String(buffer);
+                categoryDTO.ImageString = imageUrl;
+            }
+            catch (Exception ex)
+            {
+                await sweetAlertService.FireAsync("Error", $"Error al cargar la imagen: {ex.Message}", SweetAlertIcon.Error);
+                fileName = string.Empty;
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    public async Task<bool> EditAsync()
+    {
+        if (categoryDTO is null || string.IsNullOrWhiteSpace(categoryDTO.Name))
+        {
+            await sweetAlertService.FireAsync("Error", "El nombre de la categoría es obligatorio.", SweetAlertIcon.Error);
+            return false;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var responseHttp = await repository.Put("/api/categories", categoryDTO);
+            if (responseHttp.Error)
+            {
+                var message = await responseHttp.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                return false;
+            }
+
+            await sweetAlertService.FireAsync("Éxito", "Categoría actualizada exitosamente", SweetAlertIcon.Success);
+            return true;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task Cancel()
+    {
+        await Modal.HideAsync();
+    }
+
+    private List<KeyValuePair<string, string>> GetIconList()
+    {
+        return new List<KeyValuePair<string, string>>
+        {
+            // Computadoras
+            new("Desktop", "PC"),
+            new("Laptop", "Laptop"),
+            new("Tablet", "Tablet"),
+            new("Smartphone", "Teléfono"),
+
+            // Componentes
+            new("Memory", "Memoria"),
+            new("Storage", "Almacenamiento"),
+            new("Cpu", "Procesador"),
+            new("Gpu", "Gráficos"),
+
+            // Periféricos
+            new("Mouse", "Ratón"),
+            new("Keyboard", "Teclado"),
+            new("Monitor", "Monitor"),
+            new("Headphones", "Audífonos"),
+            new("Speaker", "Parlante"),
+            new("Camera", "Cámara"),
+            new("Printer", "Impresora"),
+
+            // Red y Conectividad
+            new("Router", "Router"),
+            new("Wifi", "WiFi"),
+            new("Cable", "Cables"),
+            new("NetworkCheck", "Red"),
+            new("SecurityCamera", "Cámara IP"),
+
+            // Oficina
+            new("Print", "Impresión"),
+            new("Description", "Documentos"),
+            new("Chair", "Muebles"),
+            new("Lightbulb", "Iluminación"),
+
+            // Software y Servicios
+            new("Code", "Software"),
+            new("Cloud", "Nube"),
+            new("VpnLock", "Seguridad"),
+            new("Extension", "Extensiones"),
+
+            // Accesorios
+            new("Backpack", "Mochilas"),
+            new("Cases", "Fundas"),
+            new("DisplaySettings", "Soportes"),
+            new("Settings", "Accesorios")
+        };
+    }
+
+    private string GetCategoryIcon(string? iconName)
+    {
+        if (string.IsNullOrEmpty(iconName))
+        {
+            return Icons.Material.Filled.Category;
+        }
+
+        // Mapeo de iconos de Material Design - Categorías de Tecnología
+        return iconName switch
+        {
+            // Computadoras
+            "Desktop" => Icons.Material.Filled.DesktopMac,
+            "Laptop" => Icons.Material.Filled.Laptop,
+            "Tablet" => Icons.Material.Filled.TabletMac,
+            "Smartphone" => Icons.Material.Filled.Smartphone,
+
+            // Componentes
+            "Memory" => Icons.Material.Filled.Memory,
+            "Storage" => Icons.Material.Filled.FolderOpen,
+            "Cpu" => Icons.Material.Filled.Memory,
+            "Gpu" => Icons.Material.Filled.ViewWeek,
+            "HardDrive" => Icons.Material.Filled.Folder,
+            "SSD" => Icons.Material.Filled.SdStorage,
+
+            // Periféricos
+            "Mouse" => Icons.Material.Filled.TouchApp,
+            "Keyboard" => Icons.Material.Filled.Keyboard,
+            "Monitor" => Icons.Material.Filled.Monitor,
+            "Headphones" => Icons.Material.Filled.Headphones,
+            "Speaker" => Icons.Material.Filled.Speaker,
+            "Camera" => Icons.Material.Filled.Camera,
+            "Printer" => Icons.Material.Filled.Print,
+
+            // Red y Conectividad
+            "Router" => Icons.Material.Filled.Router,
+            "Wifi" => Icons.Material.Filled.Wifi,
+            "Cable" => Icons.Material.Filled.Cable,
+            "NetworkCheck" => Icons.Material.Filled.CloudQueue,
+            "SecurityCamera" => Icons.Material.Filled.Videocam,
+
+            // Oficina
+            "Print" => Icons.Material.Filled.Print,
+            "Description" => Icons.Material.Filled.Description,
+            "Chair" => Icons.Material.Filled.EventSeat,
+            "Lightbulb" => Icons.Material.Filled.Lightbulb,
+
+            // Software y Servicios
+            "Code" => Icons.Material.Filled.Code,
+            "Cloud" => Icons.Material.Filled.Cloud,
+            "VpnLock" => Icons.Material.Filled.VpnLock,
+            "Extension" => Icons.Material.Filled.Extension,
+
+            // Accesorios
+            "Backpack" => Icons.Material.Filled.Backpack,
+            "Cases" => Icons.Material.Filled.Cases,
+            "DisplaySettings" => Icons.Material.Filled.DisplaySettings,
+            "Settings" => Icons.Material.Filled.Settings,
+
+            // Legacy (para compatibilidad)
+            "ShoppingCart" => Icons.Material.Filled.ShoppingCart,
+            "Category" => Icons.Material.Filled.Category,
+            _ => Icons.Material.Filled.Category
+        };
     }
 }

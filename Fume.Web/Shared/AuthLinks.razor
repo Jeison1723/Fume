@@ -1,7 +1,7 @@
 ﻿<AuthorizeView>
     <Authorized>
         <div class="d-flex align-items-center">
-            Hola, <a href="EditUser" class="nav-link btn btn-link">@context.User.Identity!.Name</a>
+          
 
             @if (!string.IsNullOrEmpty(photoUser))
             {
@@ -14,7 +14,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        <NavLink href="Register" class="nav-link btn btn-link">Registro</NavLink>
+        <NavLink href="Register" class="nav-link btn btn-link" style="margin-right: 1rem;">Registro</NavLink>
         <NavLink href="Login" class="nav-link btn btn-link">Iniciar Sesión</NavLink>
     </NotAuthorized>
 </AuthorizeView>

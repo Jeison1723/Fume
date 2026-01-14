@@ -1,20 +1,1223 @@
-﻿@page "/"
+@page "/"
+@page "/category/{CategoryId:int}"
+@page "/subcategory/{SubCategoryId:int}"
+@inject IRepository repository
+@inject NavigationManager navigationManager
+@inject SweetAlertService sweetAlertService
+@inject Fume.Web.Services.CatalogNavigationService catalogNavigation
+@inject Fume.Web.Services.CartService cartService
+@inject Fume.Web.Services.CatalogCacheService cacheService
+@inject AuthenticationStateProvider authenticationStateProvider
+@using Microsoft.AspNetCore.Components.Web
+@layout MainLayout
+@using MudBlazor
+@using Fume.Web.Helpers
+@implements IDisposable
 
-<PageTitle>Index</PageTitle>
+<style type="text/css">
+    /* Header Section */
+    .header-section {
+        background-color: #fff;
+        /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+        /* margin-bottom: 0px; */
+        position: sticky;
+        top: 48px;
+        border-radius: 68px;
+        z-index: 1000;
+        width: fit-content;
+        /* right: 11%; */
+        left: 100%;
+        height: -18%;
+    }
 
-<AuthorizeView Roles="Admin">
+    .header-container {
+        display: flex;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0px 0px;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 20px;
+        height: 65px;
+    }
 
-    <Authorized>
-        <p>Estas autenticado, @context.User.Identity?.Name </p>
-    </Authorized>
+    .logo-section img {
+        height: 60px;
+        cursor: pointer;
+    }
+
+    .search-section {
+        flex-shrink: 0;
+        width: 400px;
+    }
+
+    .search-section :deep .mud-input-root {
+        border-radius: 25px;
+    }
+
+    .search-section :deep .mud-input-outlined {
+        border-radius: 25px;
+    }
+
+    .search-section :deep .mud-input-outlined .mud-input-root {
+        border-radius: 25px;
+    }
+
+    .search-section :deep .mud-input {
+        border-radius: 25px;
+    }
+
+    .cart-section {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    /* Banner Section */
+    .banner-section {
+        width: 100%;
+        height: 400px;
+        background-image: url('/Fullfondo.png');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        margin-bottom: 40px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .banner-section.small {
+        height: 200px;
+    }
+
+    .banner-section.small .banner-content h1 {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+
+    .banner-section.small .banner-content p {
+        font-size: 1rem;
+    }
+
+    .banner-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .banner-content {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        color: white;
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .banner-content h1 {
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        transition: font-size 0.2s ease;
+    }
+
+    .banner-content p {
+        font-size: 1.5rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        transition: font-size 0.2s ease;
+    }
+
+    /* Breadcrumb */
+    .breadcrumb-nav {
+      
+        padding: 15px 20px;
+        margin-bottom: 30px;
+        border-radius: 8px;
+        position: sticky;
+        top: 75px;
+        z-index: 999;
+       
+    }
+
+    .breadcrumb-nav a {
+        color: #2196F3;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s;
+    }
+
+    .breadcrumb-nav a:hover {
+        color: #1976D2;
+        text-decoration: underline;
+    }
+
+    /* Category/SubCategory Grid */
+    .category-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0;
+        padding: 20px 0;
+        animation: fadeInUp 0.3s ease-out;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .category-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-right: 1px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+     
+    }
+
+    .category-item:nth-child(4n) {
+        border-right: none;
+    }
+
+    .category-item:hover {
+       
+        transform: scale(1.05);
+    }
+
+    .category-image {
+       
+        overflow: hidden;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 15px;
+       
+    }
+
+    .category-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .category-item:hover .category-image img {
+        transform: scale(1.1);
+    }
+
+    .category-image-placeholder {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+    }
+
+    .category-info {
+        text-align: center;
+    }
+
+    .category-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .category-count {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    /* Product Cards */
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 25px;
+        padding: 20px 0;
+        animation: fadeInUp 0.3s ease-out;
+    }
+
+    .product-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    .product-image {
+        width: 100%;
+        height: 220px;
+        overflow: hidden;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .product-image img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+    }
+
+    .product-card:hover .product-image img {
+        transform: scale(1.1);
+    }
+
+    .product-info {
+        padding: 20px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .product-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        min-height: 48px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .product-description {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-bottom: 15px;
+        min-height: 40px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .product-price {
+        font-size: 1.75rem;
+        font-weight: bold;
+        color: #27ae60;
+        margin-bottom: 15px;
+    }
+
+    .product-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: auto;
+    }
+
+    .section-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .section-subtitle {
+        font-size: 1.1rem;
+        color: #6c757d;
+        margin-bottom: 30px;
+    }
+
+    @@media (max-width: 768px) {
+        .header-container {
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-section {
+            width: 100%;
+            order: 2;
+        }
+
+        .cart-section {
+            order: 1;
+        }
+
+        .banner-section {
+            height: 250px;
+        }
+
+        .banner-content h1 {
+            font-size: 2rem;
+        }
+
+        .banner-content p {
+            font-size: 1rem;
+        }
+
+        .category-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .category-item:nth-child(2n) {
+            border-right: none;
+        }
+
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .category-grid {
+            grid-template-columns: repeat(1, 1fr);
+        }
+
+        .category-item {
+            border-right: none;
+        }
+    }
+</style>
+
+
+<div class="header-section">
+    <div class="header-container">
+        <div class="search-section">
+            <div class="input-group">
+                <span class="input-group-text" style="background: white; border-right: none; border-radius: 25px 0 0 25px;">
+                    <i class="oi oi-magnifying-glass"></i>
+                </span>
+                <input type="text"
+                       class="form-control"
+                       placeholder="Buscar productos..."
+                       @bind-value="_filter"
+                       @bind-value:event="oninput"
+                       style="border-left: none; border-right: none; box-shadow: none;" />
+                @if (!string.IsNullOrWhiteSpace(_filter))
+                {
+                    <span class="input-group-text"
+                          style="background: white; border-left: none; border-radius: 0 25px 25px 0; cursor: pointer;"
+                          @onclick="ClearSearch">
+                        <i class="oi oi-x"></i>
+                    </span>
+                }
+                else
+                {
+                    <span class="input-group-text" style="background: white; border-left: none; border-radius: 0 25px 25px 0;">
+                    </span>
+                }
+            </div>
+        </div>
+
+        <div class="cart-section">
+            <AuthorizeView>
+                <Authorized>
+                    <div style="cursor: pointer;" @onclick="ToggleMiniCart">
+                        <MudBadge Content="@cartService.ItemCount" Overlap="true" Class="mx-6 my-4">
+                            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Info" />
+                        </MudBadge>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</div>
+
+
+<MiniCart IsOpen="@isMiniCartOpen" OnClose="@(() => isMiniCartOpen = false)" />
+
+ 
+<div  style="height: 71px;background: #ffffff;padding: 15px 0;margin-bottom: 30px;border-radius: 8px;position: sticky;top: 48px;z-index: 999;">
+
+  
+        @if (currentView != ViewType.Categories)
+        {
+            <div class="breadcrumb-nav">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="#" @onclick="@(() => GoToHome())" @onclick:preventDefault>
+                            <li class="breadcrumb-item active"></li> Inicio
+                            </a>
+                        </li>
+                        @if (currentView == ViewType.SubCategories && selectedCategory != null)
+                        {
+                            <li class="breadcrumb-item active">@selectedCategory.Name</li>
+                        }
+                        @if (currentView == ViewType.Products && selectedSubCategory != null)
+                        {
+                            <li class="breadcrumb-item">
+                                <a href="#" @onclick="@(() => GoToSubCategories(selectedCategory!))" @onclick:preventDefault>
+                                    @selectedCategory?.Name
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item active">@selectedSubCategory.Name</li>
+                        }
+                    </ol>
+                </nav>
+            </div>
+        }
+    </div>
+<div class="banner-section @(currentView != ViewType.Categories ? "small" : "")">
+    <div class="banner-overlay"></div>
+    <div class="banner-content">
+        @if (currentView == ViewType.Categories)
+        {
+            <h1>Bienvenido a ITPlus</h1>
+            <p>Encuentra los mejores productos al mejor precio</p>
+        }
+        else if (currentView == ViewType.SubCategories && selectedCategory != null)
+        {
+            <h1>@selectedCategory.Name</h1>
+            <p>Explora nuestras subcategorías</p>
+        }
+        else if (currentView == ViewType.Products && selectedSubCategory != null)
+        {
+            <h1>@selectedSubCategory.Name</h1>
+            <p>Descubre nuestros productos</p>
+        }
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="spinner" />
+}
+else
+{
+    <div class="container" style="max-width: 1400px; min-height:95vh">
+        <!-- Breadcrumb Navigation -->
+       
+
+        <!-- Categories View -->
+        @if (currentView == ViewType.Categories)
+        {
+            <div class="section-title">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Primary" />
+                Explora Nuestras Categorías
+            </div>
+            <p class="section-subtitle">Selecciona una categoría para ver sus subcategorías</p>
+
+            @if (categories != null && categories.Any())
+            {
+                <div class="category-grid">
+                    @foreach (var category in categories)
+                    {
+                        <div class="category-item" @onclick="@(() => GoToSubCategories(category))">
+                            <div class="category-image">
+                                @{
+                                    var categoryImageUrl = ImageUrlHelper.GetCategoryImageUrl(category);
+                                }
+                                @if (categoryImageUrl != "/images/no-image.png")
+                                {
+                                    <img src="@categoryImageUrl" alt="@category.Name" />
+                                }
+                                else
+                                {
+                                    <div class="category-image-placeholder">
+                                        <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Surface" />
+                                    </div>
+                                }
+                            </div>
+                            <div class="category-info">
+                                <div class="category-name">@category.Name</div>
+                                <div class="category-count">
+                                    @category.SubCategoriesNumber subcategorías
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Style="opacity: 0.3;" />
+                    <p class="text-muted mt-3">No hay categorías disponibles</p>
+                </div>
+            }
+        }
+
+        <!-- SubCategories View -->
+        @if (currentView == ViewType.SubCategories)
+        {
+            <div class="section-title">
+                <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Large" Color="Color.Info" />
+                Subcategorías de @selectedCategory?.Name
+            </div>
+            <p class="section-subtitle">Selecciona una subcategoría para ver sus productos</p>
+
+            @if (subCategories != null && subCategories.Any())
+            {
+                <div class="category-grid">
+                    @foreach (var subCategory in subCategories)
+                    {
+                        <div class="category-item" @onclick="@(() => GoToProducts(subCategory))">
+                            <div class="category-image">
+                                @{
+                                    var subCategoryImageUrl = ImageUrlHelper.GetSubCategoryImageUrl(subCategory);
+                                }
+                                @if (subCategoryImageUrl != "/images/no-image.png")
+                                {
+                                    <img src="@subCategoryImageUrl" alt="@subCategory.Name" />
+                                }
+                                else
+                                {
+                                    <div class="category-image-placeholder" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
+                                        <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Large" Color="Color.Surface" />
+                                    </div>
+                                }
+                            </div>
+                            <div class="category-info">
+                                <div class="category-name">@subCategory.Name</div>
+                                <div class="category-count">
+                                    @subCategory.ProductSubCategoriesNumber productos
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Large" Style="opacity: 0.3;" />
+                    <p class="text-muted mt-3">No hay subcategorías disponibles en esta categoría</p>
+                </div>
+            }
+        }
+
+        <!-- Products View -->
+        @if (currentView == ViewType.Products)
+        {
+            <div class="section-title">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Success" />
+                Productos de @selectedSubCategory?.Name
+            </div>
+            <p class="section-subtitle">Explora nuestra selección de productos</p>
+
+            @if (loading)
+            {
+                <!-- Skeleton Loading -->
+                <div class="product-grid">
+                    @for (int i = 0; i < 8; i++)
+                    {
+                        <div class="product-card">
+                            <div class="product-image">
+                                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="220px" Width="100%" Animation="Animation.Wave" />
+                            </div>
+                            <div class="product-info">
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Height="24px" Width="80%" Animation="Animation.Wave" />
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Height="20px" Width="100%" Animation="Animation.Wave" Class="mt-2" />
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Height="20px" Width="60%" Animation="Animation.Wave" Class="mt-1" />
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Height="32px" Width="50%" Animation="Animation.Wave" Class="mt-3" />
+                                <div class="product-actions mt-3">
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="32px" Width="48%" Animation="Animation.Wave" />
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="32px" Width="48%" Animation="Animation.Wave" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (products != null && products.Any())
+            {
+                <div class="product-grid">
+                    @foreach (var product in products)
+                    {
+                        <div class="product-card">
+                            <div class="product-image" style="position: relative;">
+                                @if (!IsImageLoaded(product.Id))
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="220px" Width="100%" Animation="Animation.Wave" />
+                                }
+                                @{
+                                    var productImageUrl = product.ProductImages != null && product.ProductImages.Any()
+                                        ? ImageUrlHelper.GetProductImageUrl(product.ProductImages.First())
+                                        : "/images/no-image.png";
+                                }
+                                <img src="@productImageUrl"
+                                     alt="@product.Name"
+                                     @onload="() => OnImageLoaded(product.Id)"
+                                     style="@(IsImageLoaded(product.Id) ? "" : "display: none;")" />
+                            </div>
+                            <div class="product-info">
+                                <div class="product-name">@product.Name</div>
+                                <div class="product-description">@product.Description</div>
+                                <div class="product-price">@FormatHelper.FormatPrice(product.Price)</div>
+                                <div class="product-actions">
+                                    <a href="/orders/details/@product.Id" class="btn btn-sm btn-secondary flex-grow-1">
+                                        <i class="oi oi-info"></i> Detalles
+                                    </a>
+                                    <button class="btn btn-sm btn-primary flex-grow-1" @onclick="@(() => AddToCartAsync(product.Id))">
+                                        <i class="oi oi-plus"></i> Agregar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Style="opacity: 0.3;" />
+                    <p class="text-muted mt-3">No hay productos disponibles en esta subcategoría</p>
+                </div>
+            }
+        }
    
+    </div>
+}
 
-</AuthorizeView>
+@code {
+    private enum ViewType { Categories, SubCategories, Products }
 
-<link href="_content/Blazored.Modal/blaored-modal-css" rel="stylesheet"/>
-<h1>Fume!!</h1>
+    private ViewType currentView = ViewType.Categories;
+    private ViewType? pendingView = null;
+    private bool loading = true;
+    private bool isAuthenticated;
+    private bool firstRender = true;
+
+    private List<Category>? categories;
+    private List<SubCategory>? subCategories;
+    private List<Product>? products;
+
+    private Category? selectedCategory;
+    private SubCategory? selectedSubCategory;
+
+    // Índice rápido: ID de categoría -> Categoría (para búsqueda instantánea)
+    private Dictionary<int, Category> categoryIndex = new Dictionary<int, Category>();
+
+    // Para manejar el estado de carga de imágenes
+    private HashSet<int> loadedImages = new HashSet<int>();
+
+    // Para prevenir clics repetitivos
+    private bool isNavigating = false;
+
+    // Para el mini-carrito
+    private bool isMiniCartOpen = false;
+
+    // Cache de subcategorías por ID de categoría (ahora se usa el servicio compartido)
+    private Dictionary<int, List<SubCategory>> subCategoriesCache = new Dictionary<int, List<SubCategory>>();
+
+    // Índice rápido: ID de subcategoría -> Subcategoría (para búsqueda instantánea)
+    private Dictionary<int, SubCategory> subCategoryIndex = new Dictionary<int, SubCategory>();
+
+    // Cache de productos por ID de subcategoría (en memoria para rendimiento)
+    private Dictionary<int, List<Product>> productsCache = new Dictionary<int, List<Product>>();
+
+    // Control de renders
+    private bool shouldRender = true;
+
+    protected override bool ShouldRender()
+    {
+        if (!shouldRender)
+        {
+            shouldRender = true;
+            return false;
+        }
+        return true;
+    }
+
+    [Parameter]
+    public int? CategoryId { get; set; }
+
+    [Parameter]
+    public int? SubCategoryId { get; set; }
+
+    private string _filterValue = "";
+    private System.Threading.Timer? _searchTimer;
+
+    private string _filter
+    {
+        get => _filterValue;
+        set
+        {
+            _filterValue = value;
+
+            // Cancelar el timer anterior
+            _searchTimer?.Dispose();
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                // Si el filtro está vacío, volver inmediatamente a categorías
+                _searchTimer = null;
+                InvokeAsync(async () =>
+                {
+                    await LoadCategoriesViewAsync();
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                // Crear un nuevo timer que se ejecutará después de 500ms
+                _searchTimer = new System.Threading.Timer(_ =>
+                {
+                    InvokeAsync(async () =>
+                    {
+                        await SearchProductsAsync();
+                        StateHasChanged();
+                    });
+                }, null, 500, System.Threading.Timeout.Infinite);
+            }
+        }
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        // Solo suscribirse al evento de prefetch y carrito
+        catalogNavigation.OnSubCategoryPrefetch += HandleSubCategoryPrefetch;
+        cartService.OnChange += OnCartChanged;
+    }
+
+    private void OnCartChanged()
+    {
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Inicializar cache con versión
+            await cacheService.InitializeAsync();
+
+            await CheckIsAuthenticatedAsync();
+
+            // Verificar si cambió el usuario y limpiar cache si es necesario
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userId = user.Identity?.IsAuthenticated == true
+                ? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                : null;
+            await cacheService.CheckAndClearIfUserChangedAsync(userId);
+
+            // Inicializar el carrito si el usuario está autenticado
+            if (isAuthenticated)
+            {
+                await cartService.InitializeAsync();
+            }
+
+            // Cargar categorías primero
+            await LoadCategoriesAsync();
+
+            // Pre-cargar productos desde localStorage en memoria
+            await LoadAllProductsFromLocalStorage();
+
+            // Luego cargar la vista basada en parámetros de ruta
+            await LoadViewBasedOnParametersAsync();
+
+            this.firstRender = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAllProductsFromLocalStorage()
+    {
+       
+        await Task.CompletedTask;
+    }
+
+    protected async override Task OnParametersSetAsync()
+    {
+        // Siempre cargar la vista basada en parámetros cuando cambian
+        if (!firstRender)
+        {
+            await LoadViewBasedOnParametersAsync();
+        }
+    }
+
+    private async Task LoadViewBasedOnParametersAsync()
+    {
+        // Si hay SubCategoryId, mostrar productos
+        if (SubCategoryId.HasValue && SubCategoryId.Value > 0)
+        {
+            await LoadProductsBySubCategoryIdAsync(SubCategoryId.Value);
+        }
+        // Si hay CategoryId, mostrar subcategorías
+        else if (CategoryId.HasValue && CategoryId.Value > 0)
+        {
+            await LoadSubCategoriesByCategoryIdAsync(CategoryId.Value);
+        }
+        // Si no hay parámetros, mostrar categorías
+        else
+        {
+            await LoadCategoriesViewAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        // Desuscribirse de los eventos cuando el componente se destruye
+        catalogNavigation.OnSubCategoryPrefetch -= HandleSubCategoryPrefetch;
+        cartService.OnChange -= OnCartChanged;
+
+        // Limpiar el timer de búsqueda
+        _searchTimer?.Dispose();
+    }
 
 
-Welcome!!
+    private void HandleSubCategoryPrefetch(SubCategory subCategory)
+    {
+        // Pre-cargar productos en segundo plano sin cambiar la vista
+        _ = Task.Run(async () =>
+        {
+            // Solo pre-cargar si no está en memoria
+            if (!productsCache.ContainsKey(subCategory.Id))
+            {
+                try
+                {
+                    var response = await repository.Get<List<Product>>($"/api/products/subcategory/{subCategory.Id}");
+                    if (!response.Error && response.Response != null)
+                    {
+                        // Guardar en memoria y localStorage (sin bloquear)
+                        productsCache[subCategory.Id] = response.Response;
+                        _ = cacheService.SetProductsAsync(subCategory.Id, response.Response);
+                    }
+                }
+                catch
+                {
+                    // Silenciar errores de prefetch
+                }
+            }
+        });
+    }
 
-<SurveyPrompt Title="How is Blazor working for you?" />
+    private async Task CheckIsAuthenticatedAsync()
+    {
+        var authenticationState = await authenticationStateTask;
+        isAuthenticated = authenticationState.User.Identity!.IsAuthenticated;
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        loading = true;
+        // Usar endpoint ligero para mejor rendimiento
+        var response = await repository.Get<List<Category>>("/api/categories/light?RecordsNumber=999");
+
+        if (response.Error)
+        {
+            var message = await response.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            loading = false;
+            return;
+        }
+
+        categories = response.Response;
+
+        // Construir índice de categorías para búsqueda O(1)
+        if (categories != null)
+        {
+            categoryIndex.Clear();
+            foreach (var cat in categories)
+            {
+                categoryIndex[cat.Id] = cat;
+            }
+        }
+
+        loading = false;
+    }
+
+    private async Task LoadCategoriesViewAsync()
+    {
+        if (categories == null || !categories.Any())
+        {
+            await LoadCategoriesAsync();
+        }
+        else
+        {
+            selectedCategory = null;
+            selectedSubCategory = null;
+            subCategories = null;
+            products = null;
+            currentView = ViewType.Categories;
+            loading = false;
+        }
+    }
+
+    private async Task LoadSubCategoriesByCategoryIdAsync(int categoryId)
+    {
+        if (isNavigating) return;
+        isNavigating = true;
+
+        try
+        {
+            // Intentar obtener del cache primero
+            if (subCategoriesCache.TryGetValue(categoryId, out var cachedSubCategories))
+            {
+                // Cargar la categoría usando índice O(1) - INSTANTÁNEO
+                if (selectedCategory?.Id != categoryId)
+                {
+                    categoryIndex.TryGetValue(categoryId, out selectedCategory);
+                }
+
+                subCategories = cachedSubCategories;
+                currentView = ViewType.SubCategories;
+                loading = false;
+                return;
+            }
+
+            // Cargar desde API
+            loading = true;
+            currentView = ViewType.SubCategories;
+
+            // Cargar categoría usando índice O(1) - INSTANTÁNEO
+            if (selectedCategory?.Id != categoryId)
+            {
+                if (!categoryIndex.TryGetValue(categoryId, out selectedCategory))
+                {
+                    // Si no está en índice, cargar desde API
+                    var catResponse = await repository.Get<Category>($"/api/categories/{categoryId}");
+                    if (!catResponse.Error && catResponse.Response != null)
+                    {
+                        selectedCategory = catResponse.Response;
+                        categoryIndex[categoryId] = selectedCategory;
+                    }
+                }
+            }
+
+            var response = await repository.Get<List<SubCategory>>($"/api/subcategories/bycategory/{categoryId}");
+
+            if (response.Error)
+            {
+                var message = await response.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                loading = false;
+                return;
+            }
+
+            subCategories = response.Response;
+            if (subCategories != null)
+            {
+                subCategoriesCache[categoryId] = subCategories;
+
+                // Agregar al índice rápido para búsqueda O(1)
+                foreach (var subCat in subCategories)
+                {
+                    if (subCat != null && !subCategoryIndex.ContainsKey(subCat.Id))
+                    {
+                        subCategoryIndex[subCat.Id] = subCat;
+                    }
+                }
+            }
+
+            loading = false;
+        }
+        finally
+        {
+            isNavigating = false;
+        }
+    }
+
+    private async Task LoadProductsBySubCategoryIdAsync(int subCategoryId)
+    {
+        if (isNavigating) return;
+        isNavigating = true;
+
+        try
+        {
+            currentView = ViewType.Products;
+
+            // Optimización: Buscar subcategoría solo si cambió - usar índice O(1)
+            if (selectedSubCategory?.Id != subCategoryId)
+            {
+                // Búsqueda instantánea usando índice O(1)
+                if (subCategoryIndex.TryGetValue(subCategoryId, out var foundSubCategory))
+                {
+                    selectedSubCategory = foundSubCategory;
+
+                    // Obtener categoría padre usando índice O(1) - INSTANTÁNEO
+                    if (selectedSubCategory.CategoryId > 0)
+                    {
+                        categoryIndex.TryGetValue(selectedSubCategory.CategoryId, out selectedCategory);
+                    }
+                }
+                else
+                {
+                    // Si no está en índice, cargar desde API (último recurso)
+                    var subCatResponse = await repository.Get<SubCategory>($"/api/subcategories/{subCategoryId}");
+                    if (!subCatResponse.Error && subCatResponse.Response != null)
+                    {
+                        selectedSubCategory = subCatResponse.Response;
+
+                        // Agregar al índice para futuras búsquedas
+                        subCategoryIndex[subCategoryId] = selectedSubCategory;
+
+                        if (selectedSubCategory.Category != null)
+                        {
+                            selectedCategory = selectedSubCategory.Category;
+                        }
+                    }
+                }
+            }
+
+            // Intentar obtener productos del cache en memoria primero (instantáneo)
+            if (productsCache.TryGetValue(subCategoryId, out var cachedProducts))
+            {
+                products = cachedProducts;
+                loading = false;
+                return;
+            }
+
+            // Cargar productos desde API solo si no están en cache
+            loading = true;
+            loadedImages.Clear();
+
+            var response = await repository.Get<List<Product>>($"/api/products/subcategory/{subCategoryId}");
+
+            if (response.Error)
+            {
+                var message = await response.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                loading = false;
+                return;
+            }
+
+            products = response.Response;
+            if (products != null)
+            {
+                // Guardar en memoria (inmediato)
+                productsCache[subCategoryId] = products;
+                // Guardar en localStorage en segundo plano (sin bloquear)
+                _ = cacheService.SetProductsAsync(subCategoryId, products);
+            }
+
+            loading = false;
+        }
+        finally
+        {
+            isNavigating = false;
+        }
+    }
+
+
+    private bool IsImageLoaded(int productId)
+    {
+        return loadedImages.Contains(productId);
+    }
+
+    private void OnImageLoaded(int productId)
+    {
+        loadedImages.Add(productId);
+        StateHasChanged();
+    }
+
+    private void GoToHome()
+    {
+        navigationManager.NavigateTo("/", forceLoad: false);
+    }
+
+    private void GoToSubCategories(Category category)
+    {
+        navigationManager.NavigateTo($"/category/{category.Id}", forceLoad: false);
+    }
+
+    private void GoToProducts(SubCategory subCategory)
+    {
+        navigationManager.NavigateTo($"/subcategory/{subCategory.Id}", forceLoad: false);
+    }
+
+    private async Task SearchProductsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_filterValue))
+        {
+            // Si el filtro está vacío, volver a la vista de categorías
+            await LoadCategoriesViewAsync();
+            return;
+        }
+
+        loading = true;
+        var response = await repository.Get<List<Product>>($"/api/products?filter={_filterValue}");
+
+        if (response.Error)
+        {
+            var message = await response.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            loading = false;
+            return;
+        }
+
+        products = response.Response;
+        currentView = ViewType.Products;
+        selectedCategory = null;
+        selectedSubCategory = null;
+        loading = false;
+    }
+
+    private async Task ClearSearch()
+    {
+        // Cancelar cualquier búsqueda pendiente
+        _searchTimer?.Dispose();
+        _searchTimer = null;
+
+        // Limpiar el filtro
+        _filterValue = string.Empty;
+
+        // Volver a la vista de categorías
+        await LoadCategoriesViewAsync();
+        StateHasChanged();
+    }
+
+    private async Task AddToCartAsync(int productId)
+    {
+        if (!isAuthenticated)
+        {
+            navigationManager.NavigateTo("/Login");
+            var toast = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.BottomEnd,
+                ShowConfirmButton = false,
+                Timer = 5000,
+                TimerProgressBar = true
+            });
+            await toast.FireAsync(icon: SweetAlertIcon.Error, message: "Debes haber iniciado sesión para poder agregar productos al carro de compras.");
+            return;
+        }
+
+        // Usar el CartService para agregar al carrito
+        await cartService.AddToCartAsync(productId, 1);
+    }
+
+    private void ToggleMiniCart()
+    {
+        isMiniCartOpen = !isMiniCartOpen;
+    }
+}

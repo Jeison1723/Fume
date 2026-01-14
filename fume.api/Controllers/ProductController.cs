@@ -12,23 +12,32 @@ namespace fume.api.Controllers
     [ApiController]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [Route("/api/products")]
-    public class ProductsController : ControllerBase
+    public class ProductController : ControllerBase
     {
         private readonly DataContext _context;
         private readonly IFileStorage _fileStorage;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ProductsController(DataContext context, IFileStorage fileStorage)
+        public ProductController(DataContext context, IFileStorage fileStorage, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _fileStorage = fileStorage;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        private string GetImageUrl(string path, int id)
+        {
+            var request = _httpContextAccessor.HttpContext?.Request;
+            var baseUrl = $"{request?.Scheme}://{request?.Host}";
+            return $"{baseUrl}/api/images/{path}/{id}";
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult> Get([FromQuery] PaginationDTO pagination)
         {
             var queryable = _context.Products
-                .Include(x => x.ProductImages)
-                .Include(x => x.ProductCategories)
+                .AsNoTracking() // No rastrear cambios = más rápido
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(pagination.Filter))
@@ -36,10 +45,51 @@ namespace fume.api.Controllers
                 queryable = queryable.Where(x => x.Name.ToLower().Contains(pagination.Filter.ToLower()));
             }
 
-            return Ok(await queryable
+            // Primero obtener con información de si tiene imagen
+            var tempProducts = await queryable
                 .OrderBy(x => x.Name)
                 .Paginate(pagination)
-                .ToListAsync());
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    x.Description,
+                    x.Price,
+                    x.Stock,
+                    ProductCategories = x.ProductCategories,
+                    ProductSubCategories = x.ProductSubCategories,
+                    ProductImages = x.ProductImages.Select(img => new
+                    {
+                        img.Id,
+                        img.ProductId,
+                        img.ImageUrl,
+                        HasImage = img.Imagefile != null && img.Imagefile.Length > 0
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            // Mapear a Product con URLs generadas
+            var products = tempProducts.Select(x => new Product
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Description = x.Description,
+                Price = x.Price,
+                Stock = x.Stock,
+                ProductCategories = x.ProductCategories,
+                ProductSubCategories = x.ProductSubCategories,
+                ProductImages = x.ProductImages.Select(img => new ProductImage
+                {
+                    Id = img.Id,
+                    ProductId = img.ProductId,
+                    Imagefile = null,
+                    ImageUrl = !string.IsNullOrEmpty(img.ImageUrl)
+                        ? img.ImageUrl
+                        : (img.HasImage ? GetImageUrl("products", img.Id) : null)
+                }).ToList()
+            }).ToList();
+
+            return Ok(products);
         }
 
 
@@ -60,12 +110,15 @@ namespace fume.api.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAsync(int id)
         {
             var product = await _context.Products
-                .Include(x => x.ProductImages)
                 .Include(x => x.ProductCategories!)
                 .ThenInclude(x => x.Category)
+                .Include(x => x.ProductSubCategories!)
+                .ThenInclude(x => x.SubCategory)
+                .Include(x => x.ProductImages)
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (product == null)
             {
@@ -78,6 +131,42 @@ namespace fume.api.Controllers
         [HttpPost]
         public async Task<ActionResult> PostAsync(ProductDTO productDTO)
         {
+            // Validar que el nombre no sea nulo o vacío
+            if (string.IsNullOrWhiteSpace(productDTO.Name))
+            {
+                return BadRequest("El nombre del producto es obligatorio.");
+            }
+
+            // Validar longitud máxima del nombre
+            if (productDTO.Name.Length > 100)
+            {
+                return BadRequest("El nombre del producto no puede exceder 100 caracteres.");
+            }
+
+            // Validar que el precio sea válido
+            if (productDTO.Price <= 0)
+            {
+                return BadRequest("El precio del producto debe ser mayor a 0.");
+            }
+
+            // Validar que el stock sea válido
+            if (productDTO.Stock < 0)
+            {
+                return BadRequest("El stock del producto no puede ser negativo.");
+            }
+
+            // Validar que haya al menos una imagen
+            if (productDTO.ProductImages == null || !productDTO.ProductImages.Any())
+            {
+                return BadRequest("El producto debe tener al menos una imagen.");
+            }
+
+            // Validar que haya al menos una categoría
+            if (productDTO.ProductCategoryIds == null || !productDTO.ProductCategoryIds.Any())
+            {
+                return BadRequest("El producto debe estar asociado a al menos una categoría.");
+            }
+
             try
             {
                 // Crea un nuevo producto
@@ -88,6 +177,7 @@ namespace fume.api.Controllers
                     Price = productDTO.Price,
                     Stock = productDTO.Stock,
                     ProductCategories = new List<ProductCategory>(),
+                    ProductSubCategories = new List<ProductSubCategory>(),
                     ProductImages = new List<ProductImage>()
                 };
 
@@ -99,9 +189,9 @@ namespace fume.api.Controllers
                 foreach (var productImage in productDTO.ProductImages!)
                 {
                     var photoProduct = Convert.FromBase64String(productImage);
-                    var savedImage = await _fileStorage.SaveFileAsync(photoProduct, ".jpg", "products");
+                    //var savedImage = await _fileStorage.SaveFileAsync(photoProduct, ".jpg", "products");
 
-                    // Asocia la imagen al producto
+                    //// Asocia la imagen al producto
                     newProduct.ProductImages.Add(new ProductImage { Imagefile = Convert.FromBase64String(productImage), ProductId = newProduct.Id });
                     await _context.SaveChangesAsync();
                 }
@@ -110,10 +200,23 @@ namespace fume.api.Controllers
                 foreach (var productCategoryId in productDTO.ProductCategoryIds!)
                 {
                     var category = await _context.categories.FirstOrDefaultAsync(x => x.Id == productCategoryId);
-                    newProduct.ProductCategories.Add(new ProductCategory { Category = category! });
+                    newProduct.ProductCategories.Add(new ProductCategory { ProductId = newProduct.Id, CategoryId = productCategoryId, Category = category! });
                 }
 
-                // Guarda los cambios finales en el producto (con categorías e imágenes asociadas)
+                // Asocia las subcategorías al producto
+                if (productDTO.ProductSubCategoryIds != null && productDTO.ProductSubCategoryIds.Any())
+                {
+                    foreach (var productSubCategoryId in productDTO.ProductSubCategoryIds)
+                    {
+                        var subCategory = await _context.SubCategories.FirstOrDefaultAsync(x => x.Id == productSubCategoryId);
+                        if (subCategory != null)
+                        {
+                            newProduct.ProductSubCategories!.Add(new ProductSubCategory { ProductId = newProduct.Id, SubCategoryId = productSubCategoryId, SubCategory = subCategory });
+                        }
+                    }
+                }
+
+                // Guarda los cambios finales en el producto (con categorías, subcategorías e imágenes asociadas)
                 await _context.SaveChangesAsync();
 
                 return Ok(productDTO);
@@ -131,16 +234,48 @@ namespace fume.api.Controllers
             {
                 return BadRequest(exception.Message);
             }
-          
+
         }
 
         [HttpPut]
         public async Task<ActionResult> PutAsync(ProductDTO productDTO)
         {
+            // Validar que el nombre no sea nulo o vacío
+            if (string.IsNullOrWhiteSpace(productDTO.Name))
+            {
+                return BadRequest("El nombre del producto es obligatorio.");
+            }
+
+            // Validar longitud máxima del nombre
+            if (productDTO.Name.Length > 100)
+            {
+                return BadRequest("El nombre del producto no puede exceder 100 caracteres.");
+            }
+
+            // Validar que el precio sea válido
+            if (productDTO.Price <= 0)
+            {
+                return BadRequest("El precio del producto debe ser mayor a 0.");
+            }
+
+            // Validar que el stock sea válido
+            if (productDTO.Stock < 0)
+            {
+                return BadRequest("El stock del producto no puede ser negativo.");
+            }
+
+            // Validar que haya al menos una categoría
+            if (productDTO.ProductCategoryIds == null || !productDTO.ProductCategoryIds.Any())
+            {
+                return BadRequest("El producto debe estar asociado a al menos una categoría.");
+            }
+
             try
             {
                 var product = await _context.Products
                     .Include(x => x.ProductCategories)
+                    .Include(x => x.ProductSubCategories)
+                    .Include(x => x.ProductImages)
                     .FirstOrDefaultAsync(x => x.Id == productDTO.Id);
                 if (product == null)
                 {
@@ -151,7 +286,39 @@ namespace fume.api.Controllers
                 product.Description = productDTO.Description;
                 product.Price = productDTO.Price;
                 product.Stock = productDTO.Stock;
-                product.ProductCategories = productDTO.ProductCategoryIds!.Select(x => new ProductCategory { CategoryId = x }).ToList();
+                product.ProductCategories = productDTO.ProductCategoryIds!.Select(x => new ProductCategory { ProductId = product.Id, CategoryId = x }).ToList();
+
+                // Actualiza las subcategorías
+                if (productDTO.ProductSubCategoryIds != null)
+                {
+                    product.ProductSubCategories = productDTO.ProductSubCategoryIds.Select(x => new ProductSubCategory { ProductId = product.Id, SubCategoryId = x }).ToList();
+                }
+                else
+                {
+                    product.ProductSubCategories = new List<ProductSubCategory>();
+                }
+
+                // Actualiza las imágenes
+                if (productDTO.ProductImages != null && productDTO.ProductImages.Any())
+                {
+                    // Eliminar las imágenes existentes
+                    if (product.ProductImages != null)
+                    {
+                        _context.RemoveRange(product.ProductImages);
+                    }
+
+                    // Agregar las nuevas imágenes
+                    product.ProductImages = new List<ProductImage>();
+                    foreach (var productImage in productDTO.ProductImages)
+                    {
+                        var photoProduct = Convert.FromBase64String(productImage);
+                        product.ProductImages.Add(new ProductImage
+                        {
+                            Imagefile = photoProduct,
+                            ProductId = product.Id
+                        });
+                    }
+                }
 
                 _context.Update(product);
                 await _context.SaveChangesAsync();
@@ -172,6 +339,54 @@ namespace fume.api.Controllers
             }
         }
 
+
+        [HttpGet("subcategory/{subcategoryId:int}")]
+        [AllowAnonymous]
+        public async Task<ActionResult> GetBySubcategoryAsync(int subcategoryId)
+        {
+            // Primero obtener con información de si tiene imagen
+            var tempProducts = await _context.Products
+                .AsNoTracking()
+                .Where(x => x.ProductSubCategories!.Any(ps => ps.SubCategoryId == subcategoryId))
+                .OrderBy(x => x.Name)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    x.Description,
+                    x.Price,
+                    x.Stock,
+                    ProductImages = x.ProductImages.Select(img => new
+                    {
+                        img.Id,
+                        img.ProductId,
+                        img.ImageUrl,
+                        HasImage = img.Imagefile != null && img.Imagefile.Length > 0
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            // Mapear a Product con URLs generadas
+            var products = tempProducts.Select(x => new Product
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Description = x.Description,
+                Price = x.Price,
+                Stock = x.Stock,
+                ProductImages = x.ProductImages.Select(img => new ProductImage
+                {
+                    Id = img.Id,
+                    ProductId = img.ProductId,
+                    Imagefile = null,
+                    ImageUrl = !string.IsNullOrEmpty(img.ImageUrl)
+                        ? img.ImageUrl
+                        : (img.HasImage ? GetImageUrl("products", img.Id) : null)
+                }).ToList()
+            }).ToList();
+
+            return Ok(products);
+        }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteAsync(int id)

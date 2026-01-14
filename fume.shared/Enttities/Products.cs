@@ -40,13 +40,25 @@ namespace fume.shared.Enttities
         [Display(Name = "Categorías")]
         public int ProductCategoriesNumber => ProductCategories == null ? 0 : ProductCategories.Count;
 
+        public ICollection<ProductSubCategory>? ProductSubCategories { get; set; }
+
+        [Display(Name = "Subcategorías")]
+        public int ProductSubCategoriesNumber => ProductSubCategories == null ? 0 : ProductSubCategories.Count;
+
         public ICollection<ProductImage>? ProductImages { get; set; }
 
         [Display(Name = "Imágenes")]
         public int ProductImagesNumber => ProductImages == null ? 0 : ProductImages.Count;
 
         [Display(Name = "Imagén")]
-        public string MainImage => ProductImages == null || !ProductImages.Any() ? string.Empty : Convert.ToBase64String(ProductImages.First().Imagefile);
+        public string MainImage => ProductImages == null || !ProductImages.Any() || ProductImages.First().Imagefile == null
+            ? string.Empty
+            : Convert.ToBase64String(ProductImages.First().Imagefile);
+
+        [Display(Name = "Imágenes Base64")]
+        public List<string> ProductImagesString => ProductImages == null || !ProductImages.Any()
+            ? new List<string>()
+            : ProductImages.Where(x => x.Imagefile != null).Select(x => Convert.ToBase64String(x.Imagefile)).ToList();
 
 
 

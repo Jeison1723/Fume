@@ -10,38 +10,77 @@
 }
 else
 {
-    <ProductForm @ref="productForm" ProductDTO="productDTO" NonSelectedCategories="nonSelectedCategories" OnValidSubmit="CreateAsync" ReturnAction="Return" />
+    <ProductForm @ref="productForm"
+                 ProductDTO="productDTO"
+                 NonSelectedCategories="nonSelectedCategories"
+                 NonSelectedSubCategories="nonSelectedSubCategories"
+                 OnValidSubmit="CreateAsync"
+                 ReturnAction="Return" />
 }
+ 
 
 @code {
     private ProductDTO productDTO = new ProductDTO
         {
             ProductCategoryIds = new List<int>(),
+            ProductSubCategoryIds = new List<int>(),
             ProductImages = new List<string>()
         };
 
     private ProductForm? productForm;
     private List<Category> selectedCategories = new();
     private List<Category> nonSelectedCategories = new();
+    private List<SubCategory> selectedSubCategories = new();
+    private List<SubCategory> nonSelectedSubCategories = new();
     private bool loading = true;
 
-    protected async override Task OnInitializedAsync()
+    protected async override Task OnAfterRenderAsync(bool render)
     {
-        var httpResponse = await repository.Get<List<Category>>("/api/categories");
-        loading = false;
-
-        if (httpResponse.Error)
+        if (render)
         {
-            var message = await httpResponse.GetErrorMessageAsync();
-            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
-            return;
-        }
+            var categoriesResponse = await repository.Get<List<Category>>("/api/categories");
 
-        nonSelectedCategories = httpResponse.Response!;
+            if (categoriesResponse.Error)
+            {
+                var message = await categoriesResponse.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                return;
+            }
+
+            nonSelectedCategories = categoriesResponse.Response!;
+
+            // Cargar subcategorías
+            var subCategoriesResponse = await repository.Get<List<SubCategory>>("/api/subcategories");
+
+            if (subCategoriesResponse.Error)
+            {
+                var message = await subCategoriesResponse.GetErrorMessageAsync();
+                await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+                return;
+            }
+
+            nonSelectedSubCategories = subCategoriesResponse.Response!;
+            loading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task CreateAsync()
     {
+        // Obtener las subcategorías seleccionadas del ProductForm
+        if (productDTO.ProductSubCategoryIds != null && productDTO.ProductSubCategoryIds.Any())
+        {
+            // Obtener las categorías padre de las subcategorías seleccionadas
+            var categoryIds = nonSelectedSubCategories
+                .Where(sc => productDTO.ProductSubCategoryIds.Contains(sc.Id))
+                .Select(sc => sc.CategoryId)
+                .Distinct()
+                .ToList();
+
+            // Asignar las categorías automáticamente
+            productDTO.ProductCategoryIds = categoryIds;
+        }
+
         var httpResponse = await repository.post("/api/products", productDTO);
         if (httpResponse.Error)
         {
@@ -58,12 +97,6 @@ else
         productForm!.FormPostedSuccessfully = true;
         navigationManager.NavigateTo($"/products");
        
-        await sweetAlertService.FireAsync(new SweetAlertOptions
-            {
-                Title = "Confirmación",
-                Text = "Guardado Con Éxito",
-                Icon = SweetAlertIcon.Success,
-                ShowCancelButton = true,
-            });
+     
     }
 }

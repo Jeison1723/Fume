@@ -1,0 +1,222 @@
+@inject Fume.Web.Repositories.IRepository repository
+@inject SweetAlertService sweetAlertService
+@using fume.shared.DTOs
+@using CurrieTechnologies.Razor.SweetAlert2
+
+@* Footer con información de ITplus *@
+<footer class="footer-container">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudGrid Spacing="4" Class="py-6">
+            <MudItem xs="12" md="5">
+                <MudText Typo="Typo.h5" Class="footer-title mb-3">Conócenos</MudText>
+
+                <MudExpansionPanels MultiExpansion="true" Elevation="0">
+                    <MudExpansionPanel Text="¿Quiénes somos?" Class="footer-panel">
+                        <MudText Typo="Typo.body1" Class="footer-text">
+                            <strong>ITplus</strong> es una empresa especializada en soluciones tecnológicas innovadoras.
+                            Nos dedicamos a transformar ideas en realidad mediante el desarrollo de software a medida,
+                            consultoría IT y servicios de infraestructura tecnológica. Con años de experiencia en el mercado,
+                            nos hemos consolidado como un socio confiable para empresas que buscan digitalizar y optimizar sus procesos.
+                        </MudText>
+                    </MudExpansionPanel>
+
+                    <MudExpansionPanel Text="Misión" Class="footer-panel">
+                        <MudText Typo="Typo.body1" Class="footer-text">
+                            Proporcionar las tecnologías innovadoras acorde a las necesidades
+                            empresariales, con el objetivo de incrementar su competitividad y
+                            productividad implementando soluciones prácticas y creativas.
+                        </MudText>
+                    </MudExpansionPanel>
+
+                    <MudExpansionPanel Text="Visión" Class="footer-panel">
+                        <MudText Typo="Typo.body1" Class="footer-text">
+                            Apoyar a nuestros clientes brindándole soporte y asesoría tecnológica
+                            que les permita enfocarse directamente en el negocio, con la confianza
+                            de que cuentan con un centro de TI que les proporciona más que tecnología.
+                        </MudText>
+                    </MudExpansionPanel>
+
+                    <MudExpansionPanel Text="Valores" Class="footer-panel">
+                        <MudText Typo="Typo.body1" Class="footer-text">
+                            <ul class="values-list">
+                                <li><strong>Innovación:</strong> Buscamos constantemente nuevas formas de resolver problemas y mejorar procesos.</li>
+                                <li><strong>Excelencia:</strong> Nos comprometemos con la calidad en cada proyecto que realizamos.</li>
+                                <li><strong>Integridad:</strong> Actuamos con honestidad y transparencia en todas nuestras relaciones.</li>
+                                <li><strong>Compromiso:</strong> Nos dedicamos al éxito de nuestros clientes como si fuera el nuestro.</li>
+                                <li><strong>Trabajo en equipo:</strong> Valoramos la colaboración y el respeto mutuo.</li>
+                            </ul>
+                        </MudText>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.h5" Class="footer-title mb-3">Contacto</MudText>
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body2" Class="footer-text">
+                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Class="mr-2" />
+                        info@itplus.do
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="footer-text">
+                        <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-2" />
+                        +1 (809) 577 6975
+                    </MudText>
+
+
+
+                    <MudText Typo="Typo.body2" Class="footer-text">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-2" />
+                        Moca, Republica Dominicana
+                    </MudText>
+                </MudStack>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="footer-title mb-2">Síguenos</MudText>
+                <MudStack Row="true" Spacing="2">
+                    <MudIconButton Icon="@Icons.Custom.Brands.Facebook" Color="Color.Primary" Size="Size.Medium" Href="https://www.facebook.com/share/1FHcroMThK/?mibextid=wwXIfr" Target="_blank" />
+                    <MudIconButton Icon="@Icons.Custom.Brands.Twitter" Color="Color.Info" Size="Size.Medium" Href="https://x.com/itplusdo?s=11&t=Ckhq3HZGse240zh6i8YAbw" Target="_blank" />
+                    <MudIconButton Icon="@Icons.Custom.Brands.LinkedIn" Color="Color.Primary" Size="Size.Medium" Href="https://www.linkedin.com/company/itplusdominicana/" Target="_blank" />
+                    <MudIconButton Icon="@Icons.Custom.Brands.Instagram" Color="Color.Secondary" Size="Size.Medium" Href="https://www.instagram.com/itplusdom?igsh=amV0YTlqbXJ0Y2Jk" Target="_blank" />
+                </MudStack>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <div class="suggestions-card">
+                    <div class="suggestions-header">
+                        <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Class="suggestions-icon" />
+                        <MudText Typo="Typo.h5" Class="suggestions-title">Tus sugerencias importan</MudText>
+                        <MudText Typo="Typo.body2" Class="suggestions-subtitle">
+                            Ayúdanos a mejorar compartiendo tus ideas
+                        </MudText>
+                    </div>
+
+                    <MudStack Spacing="3" Class="suggestions-form">
+                        <MudTextField @bind-Value="suggestionModel.Name"
+                                      Label="Tu nombre"
+                                      Variant="Variant.Filled"
+                                      MaxLength="100"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person"
+                                      AdornmentColor="Color.Primary"
+                                      Class="modern-input" />
+
+                        <MudTextField @bind-Value="suggestionModel.Email"
+                                      Label="Tu email"
+                                      Variant="Variant.Filled"
+                                      InputType="InputType.Email"
+                                      MaxLength="100"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email"
+                                      AdornmentColor="Color.Primary"
+                                      Class="modern-input" />
+
+                        <MudTextField @bind-Value="suggestionModel.Message"
+                                      Label="Tu mensaje"
+                                      Variant="Variant.Filled"
+                                      Lines="3"
+                                      MaxLength="1000"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Message"
+                                      AdornmentColor="Color.Primary"
+                                      Class="modern-input" />
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   OnClick="SendSuggestion"
+                                   Disabled="isSending"
+                                   FullWidth="true"
+                                   Size="Size.Large"
+                                   Class="suggestion-submit-btn">
+                            @if (isSending)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Enviando...</span>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Small" Class="mr-2" />
+                                <span>Enviar Sugerencia</span>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider Class="my-3" />
+
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="footer-copyright pb-4">
+            © @DateTime.Now.Year ITplus. Todos los derechos reservados.
+        </MudText>
+    </MudContainer>
+</footer>
+
+@code {
+    private SuggestionDTO suggestionModel = new SuggestionDTO();
+    private bool isSending = false;
+
+    private async Task SendSuggestion()
+    {
+        // Validar que los campos no estén vacíos
+        if (string.IsNullOrWhiteSpace(suggestionModel.Name) ||
+            string.IsNullOrWhiteSpace(suggestionModel.Email) ||
+            string.IsNullOrWhiteSpace(suggestionModel.Message))
+        {
+            await sweetAlertService.FireAsync(new SweetAlertOptions
+            {
+                Icon = SweetAlertIcon.Warning,
+                Title = "Campos requeridos",
+                Text = "Por favor, completa todos los campos del formulario.",
+                ConfirmButtonText = "Aceptar"
+            });
+            return;
+        }
+
+        // Validar email
+        if (!IsValidEmail(suggestionModel.Email))
+        {
+            await sweetAlertService.FireAsync(new SweetAlertOptions
+            {
+                Icon = SweetAlertIcon.Warning,
+                Title = "Email inválido",
+                Text = "Por favor, ingresa un email válido.",
+                ConfirmButtonText = "Aceptar"
+            });
+            return;
+        }
+
+        isSending = true;
+
+        // Simular envío de 2 segundos (DEMO)
+        await Task.Delay(2000);
+
+        // Mostrar mensaje de éxito (simulado)
+        await sweetAlertService.FireAsync(new SweetAlertOptions
+        {
+            Icon = SweetAlertIcon.Success,
+            Title = "¡Gracias por tu sugerencia!",
+            Text = "Hemos recibido tu mensaje. Lo revisaremos pronto.",
+            ConfirmButtonText = "Aceptar",
+            ConfirmButtonColor = "#27ae60"
+        });
+
+        // Limpiar el formulario
+        suggestionModel = new SuggestionDTO();
+
+        isSending = false;
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

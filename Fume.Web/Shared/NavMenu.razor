@@ -1,55 +1,393 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Fume.Web</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
+@inject IRepository repository
+@inject NavigationManager navigationManager
+@inject Fume.Web.Services.CatalogNavigationService catalogNavigation
+@inject Fume.Web.Services.CatalogCacheService cacheService
+@inject AuthenticationStateProvider authenticationStateProvider
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="oi oi-plus" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <AuthorizeView Roles="Admin">
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="categories">
-                        <span class="oi oi-list" aria-hidden="true"></span> Categorías
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="countries">
-                        <span class="oi oi-globe" aria-hidden="true"></span> Países
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="/products">
-                        <span class="oi oi-star" aria-hidden="true"></span> Productos
-                    </NavLink>
-                </div>
-            </Authorized>
-        </AuthorizeView>
+<style>
+    :deep .mud-nav-group {
+        padding: 4px 0 !important;
+    }
 
-        
-    </nav>
-</div>
+    :deep .mud-nav-group-header {
+        padding: 8px 12px !important;
+        border-radius: 8px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    :deep .mud-nav-group-header:hover {
+        background-color: rgba(102, 126, 234, 0.12) !important;
+        transform: translateX(4px);
+    }
+
+    :deep .mud-nav-group-header-text {
+        font-weight: 600 !important;
+        font-size: 0.95em !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    :deep .mud-nav-group-item-header-icon {
+        font-size: 1.2em !important;
+    }
+
+    .nav-link-subcategory {
+        padding-left: 20px !important;
+        font-size: 0.9em !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    :deep .nav-link-subcategory {
+        padding-left: 20px !important;
+    }
+
+    :deep .nav-link-subcategory .mud-nav-link {
+        padding: 6px 12px !important;
+        border-radius: 6px !important;
+        margin: 2px 8px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    :deep .nav-link-subcategory:hover {
+        background-color: rgba(102, 126, 234, 0.15) !important;
+    }
+
+    :deep .nav-link-subcategory:hover .mud-nav-link {
+        padding-left: 18px !important;
+        background-color: rgba(102, 126, 234, 0.2) !important;
+    }
+
+    :deep .mud-nav-link {
+        border-radius: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    :deep .mud-nav-link:hover {
+        background-color: rgba(102, 126, 234, 0.15) !important;
+    }
+</style>
+
+<MudNavMenu>
+
+    <MudNavLink Href="/" Icon="@Icons.Material.Filled.ShoppingCart" IconColor="Color.Info" Style="cursor: pointer; font-weight: 600; font-size: 1.05em;">
+        ITplus Dominicana
+    </MudNavLink>
+
+
+    <MudDivider Class="my-3" />
+
+    @if (isLoading)
+    {
+        <!-- Loading Skeleton -->
+        @for (int i = 0; i < 5; i++)
+        {
+            <div style="padding: 12px; margin: 4px 8px;">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Style="border-radius: 8px;" />
+            </div>
+        }
+    }
+    else if (categories != null && categories.Any())
+    {
+        @foreach (var category in categories)
+        {
+            <MudNavGroup Class="category-nav-group"
+                         Title="@category.Name"
+                         Icon="@GetCategoryIcon(category.Icon)"
+                         IconColor="Color.Info"
+                         Expanded="@category.IsExpanded"
+                         ExpandedChanged="@(async (bool expanded) => await OnCategoryExpandedChanged(category, expanded))">
+                @if (loadingSubCategories.Contains(category.Id))
+                {
+                    <!-- Loading skeleton para subcategorías -->
+                    <div style="padding: 8px 12px;">
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="80%" />
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="70%" />
+                    </div>
+                }
+                else if (GetSubCategoriesFromCache(category.Id, out var subCategories) && subCategories != null)
+                {
+                    @if (subCategories.Any())
+                    {
+                        @foreach (var subCategory in subCategories)
+                        {
+                            <MudNavLink Class="nav-link-subcategory"
+                                        Href="@($"/subcategory/{subCategory.Id}")"
+                                        Icon="@Icons.Material.Filled.ChevronRight"
+                                        IconColor="Color.Info"
+                                        Match="NavLinkMatch.All">
+                                @subCategory.Name
+                            </MudNavLink>
+                        }
+                    }
+                    else
+                    {
+                        <MudNavLink Class="nav-link-subcategory"
+                                    Href="@($"/category/{category.Id}")"
+                                    Icon="@Icons.Material.Filled.OpenInNew"
+                                    IconColor="Color.Info"
+                                    Match="NavLinkMatch.All">
+                            Ver productos
+                        </MudNavLink>
+                    }
+                }
+            </MudNavGroup>
+        }
+    }
+    else
+    {
+        <div style="padding: 16px; text-align: center; color: #888;">
+            <MudText Typo="Typo.body2">No hay categorías disponibles</MudText>
+        </div>
+    }
+
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudDivider Class="my-2" />
+            <MudNavGroup Title="Administración" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
+                <MudNavLink Href="/users" Icon="@Icons.Material.Filled.People" IconColor="Color.Primary">
+                    Usuarios
+                </MudNavLink>
+                <MudNavLink Href="/categories" Icon="@Icons.Material.Filled.Category" IconColor="Color.Warning">
+                    Categorías
+                </MudNavLink>
+                <MudNavLink Href="/countries" Icon="@Icons.Material.Filled.Public" IconColor="Color.Secondary">
+                    Países
+                </MudNavLink>
+                <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Inventory" IconColor="Color.Info">
+                    Productos
+                </MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
 
 @code {
-    private bool collapseNavMenu = true;
+    private List<Category>? categories;
+    private HashSet<int> prefetchedSubCategories = new HashSet<int>();
+    private bool isLoading = true;
+    private HashSet<int> loadingSubCategories = new HashSet<int>();
+    private string? currentUserId;
+    private Dictionary<int, List<SubCategory>?> subCategoriesCache = new Dictionary<int, List<SubCategory>?>();
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
+    protected override async Task OnInitializedAsync()
     {
-        collapseNavMenu = !collapseNavMenu;
+        // Inicializar cache con versión
+        await cacheService.InitializeAsync();
+
+        // Verificar si cambió el usuario y limpiar cache si es necesario
+        await CheckUserAndClearCache();
+
+        // Cargar categorías y subcategorías en memoria desde localStorage
+        await LoadCategoriesAsync();
+        await LoadAllSubCategoriesFromLocalStorage();
+    }
+
+    private async Task CheckUserAndClearCache()
+    {
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var newUserId = user.Identity?.IsAuthenticated == true
+            ? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            : null;
+
+        await cacheService.CheckAndClearIfUserChangedAsync(newUserId);
+        currentUserId = newUserId;
+    }
+
+    private async Task OnCategoryExpandedChanged(Category category, bool expanded)
+    {
+        // Actualizar el estado de expansión
+        category.IsExpanded = expanded;
+
+        if (expanded)
+        {
+            // Cargar subcategorías si no están en cache
+            if (!subCategoriesCache.ContainsKey(category.Id))
+            {
+                await LoadSubCategoriesForCategory(category.Id);
+            }
+
+            // Hacer prefetch de productos solo cuando se expande (no en hover)
+            if (subCategoriesCache.TryGetValue(category.Id, out var subCategories) && subCategories != null)
+            {
+                foreach (var subCategory in subCategories)
+                {
+                    PrefetchSubCategory(subCategory);
+                }
+            }
+        }
+    }
+
+    private bool GetSubCategoriesFromCache(int categoryId, out List<SubCategory>? subCategories)
+    {
+        return subCategoriesCache.TryGetValue(categoryId, out subCategories);
+    }
+
+    private async Task LoadAllSubCategoriesFromLocalStorage()
+    {
+        // Cargar todas las subcategorías del localStorage al iniciar
+        if (categories == null) return;
+
+        foreach (var category in categories)
+        {
+            var cachedSubCategories = await cacheService.GetSubCategoriesAsync(category.Id);
+            if (cachedSubCategories != null)
+            {
+                subCategoriesCache[category.Id] = cachedSubCategories;
+            }
+        }
+    }
+
+    private async Task LoadSubCategoriesForCategory(int categoryId)
+    {
+        // Evitar múltiples cargas simultáneas
+        if (loadingSubCategories.Contains(categoryId))
+            return;
+
+        // Si ya está en memoria, no hacer nada
+        if (subCategoriesCache.ContainsKey(categoryId))
+            return;
+
+        try
+        {
+            loadingSubCategories.Add(categoryId);
+            StateHasChanged();
+
+            // Obtener del API (ya no está en localStorage)
+            var response = await repository.Get<List<SubCategory>>($"/api/subcategories/bycategory/{categoryId}");
+            if (!response.Error && response.Response != null)
+            {
+                subCategoriesCache[categoryId] = response.Response;
+                // Guardar en localStorage en segundo plano sin await
+                _ = cacheService.SetSubCategoriesAsync(categoryId, response.Response);
+            }
+            else
+            {
+                subCategoriesCache[categoryId] = new List<SubCategory>();
+                _ = cacheService.SetSubCategoriesAsync(categoryId, new List<SubCategory>());
+            }
+        }
+        catch
+        {
+            subCategoriesCache[categoryId] = new List<SubCategory>();
+            _ = cacheService.SetSubCategoriesAsync(categoryId, new List<SubCategory>());
+        }
+        finally
+        {
+            loadingSubCategories.Remove(categoryId);
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryIcon(string? iconName)
+    {
+        if (string.IsNullOrEmpty(iconName))
+        {
+            return Icons.Material.Filled.Category;
+        }
+
+        // Mapeo de iconos de Material Design - Categorías de Tecnología
+        return iconName switch
+        {
+            // Computadoras
+            "Desktop" => Icons.Material.Filled.DesktopMac,
+            "Laptop" => Icons.Material.Filled.Laptop,
+            "Tablet" => Icons.Material.Filled.TabletMac,
+            "Smartphone" => Icons.Material.Filled.Smartphone,
+
+            // Componentes
+            "Memory" => Icons.Material.Filled.Memory,
+            "Storage" => Icons.Material.Filled.FolderOpen,
+            "Cpu" => Icons.Material.Filled.Memory,
+            "Gpu" => Icons.Material.Filled.ViewWeek,
+            "HardDrive" => Icons.Material.Filled.Folder,
+            "SSD" => Icons.Material.Filled.SdStorage,
+
+            // Periféricos
+            "Mouse" => Icons.Material.Filled.TouchApp,
+            "Keyboard" => Icons.Material.Filled.Keyboard,
+            "Monitor" => Icons.Material.Filled.Monitor,
+            "Headphones" => Icons.Material.Filled.Headphones,
+            "Speaker" => Icons.Material.Filled.Speaker,
+            "Camera" => Icons.Material.Filled.Camera,
+            "Printer" => Icons.Material.Filled.Print,
+
+            // Red y Conectividad
+            "Router" => Icons.Material.Filled.Router,
+            "Wifi" => Icons.Material.Filled.Wifi,
+            "Cable" => Icons.Material.Filled.Cable,
+            "NetworkCheck" => Icons.Material.Filled.CloudQueue,
+            "SecurityCamera" => Icons.Material.Filled.Videocam,
+
+            // Oficina
+            "Print" => Icons.Material.Filled.Print,
+            "Description" => Icons.Material.Filled.Description,
+            "Chair" => Icons.Material.Filled.EventSeat,
+            "Lightbulb" => Icons.Material.Filled.Lightbulb,
+
+            // Software y Servicios
+            "Code" => Icons.Material.Filled.Code,
+            "Cloud" => Icons.Material.Filled.Cloud,
+            "VpnLock" => Icons.Material.Filled.VpnLock,
+            "Extension" => Icons.Material.Filled.Extension,
+
+            // Accesorios
+            "Backpack" => Icons.Material.Filled.Backpack,
+            "Cases" => Icons.Material.Filled.Cases,
+            "DisplaySettings" => Icons.Material.Filled.DisplaySettings,
+            "Settings" => Icons.Material.Filled.Settings,
+
+            // Legacy (para compatibilidad)
+            "ShoppingCart" => Icons.Material.Filled.ShoppingCart,
+            "Category" => Icons.Material.Filled.Category,
+            _ => Icons.Material.Filled.Category
+        };
+    }
+
+    private void PrefetchSubCategory(SubCategory subCategory)
+    {
+        // Marcar como pre-cargada para evitar múltiples llamadas
+        if (!prefetchedSubCategories.Contains(subCategory.Id))
+        {
+            prefetchedSubCategories.Add(subCategory.Id);
+            // Disparar el evento de pre-carga sin bloquear
+            catalogNavigation.PrefetchSubCategory(subCategory);
+        }
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            isLoading = true;
+
+            // Verificar si ya tenemos categorías en localStorage
+            var cachedCategories = await cacheService.GetCategoriesAsync();
+            if (cachedCategories != null)
+            {
+                categories = cachedCategories;
+                isLoading = false;
+                return;
+            }
+
+            // Usar el endpoint ligero que solo trae categorías sin subcategorías
+            var response = await repository.Get<List<Category>>("/api/categories/light?RecordsNumber=100");
+            if (!response.Error)
+            {
+                categories = response.Response;
+                await cacheService.SetCategoriesAsync(categories);
+            }
+            else
+            {
+                categories = new List<Category>();
+            }
+        }
+        catch
+        {
+            categories = new List<Category>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 }
